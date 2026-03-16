@@ -90,4 +90,6 @@ export const issuesApi = {
     api.post<Approval[]>(`/issues/${id}/approvals`, { approvalId }),
   unlinkApproval: (id: string, approvalId: string) =>
     api.delete<{ ok: true }>(`/issues/${id}/approvals/${approvalId}`),
+  createIntakeDraft: (id: string, data: Record<string, unknown> = {}) =>
+    api.post<Approval>(`/issues/${id}/intake-draft`, data),
 };

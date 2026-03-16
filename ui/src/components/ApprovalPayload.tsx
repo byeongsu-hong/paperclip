@@ -1,13 +1,15 @@
-import { UserPlus, Lightbulb, ShieldCheck } from "lucide-react";
+import { UserPlus, Lightbulb, ListTree, ShieldCheck } from "lucide-react";
 
 export const typeLabel: Record<string, string> = {
   hire_agent: "Hire Agent",
   approve_ceo_strategy: "CEO Strategy",
+  issue_intake_plan: "Issue Intake Plan",
 };
 
 export const typeIcon: Record<string, typeof UserPlus> = {
   hire_agent: UserPlus,
   approve_ceo_strategy: Lightbulb,
+  issue_intake_plan: ListTree,
 };
 
 export const defaultTypeIcon = ShieldCheck;
@@ -69,7 +71,39 @@ export function CeoStrategyPayload({ payload }: { payload: Record<string, unknow
   );
 }
 
+export function IssueIntakePayload({ payload }: { payload: Record<string, unknown> }) {
+  const rawRequest = payload.rawRequest;
+  const proposal = payload.proposal;
+  const sourceIssueId = typeof payload.sourceIssueId === "string" ? payload.sourceIssueId : null;
+  const rawRequestRecord =
+    rawRequest && typeof rawRequest === "object" && !Array.isArray(rawRequest)
+      ? (rawRequest as Record<string, unknown>)
+      : null;
+  const proposalRecord =
+    proposal && typeof proposal === "object" && !Array.isArray(proposal)
+      ? (proposal as Record<string, unknown>)
+      : null;
+  const children = Array.isArray(proposalRecord?.children) ? proposalRecord.children : [];
+  const parent =
+    proposalRecord?.parent && typeof proposalRecord.parent === "object" && !Array.isArray(proposalRecord.parent)
+      ? (proposalRecord.parent as Record<string, unknown>)
+      : null;
+
+  return (
+    <div className="mt-3 space-y-1.5 text-sm">
+      <div className="flex items-center gap-2">
+        <span className="text-muted-foreground w-20 sm:w-24 shrink-0 text-xs">Request</span>
+        <span className="font-medium">{String(rawRequestRecord?.title ?? "Untitled intake")}</span>
+      </div>
+      <PayloadField label="Parent" value={parent?.title} />
+      <PayloadField label="Children" value={`${children.length} planned`} />
+      <PayloadField label="Source" value={sourceIssueId ? sourceIssueId.slice(0, 8) : null} />
+    </div>
+  );
+}
+
 export function ApprovalPayloadRenderer({ type, payload }: { type: string; payload: Record<string, unknown> }) {
   if (type === "hire_agent") return <HireAgentPayload payload={payload} />;
+  if (type === "issue_intake_plan") return <IssueIntakePayload payload={payload} />;
   return <CeoStrategyPayload payload={payload} />;
 }
