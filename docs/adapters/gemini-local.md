@@ -43,3 +43,10 @@ Use the "Test Environment" button in the UI to validate the adapter config. It c
 - Working directory is absolute and available (auto-created if missing and permitted)
 - API key/auth hints (`GEMINI_API_KEY` or `GOOGLE_API_KEY`)
 - A live hello probe (`gemini --output-format json "Respond with hello."`) to verify CLI readiness
+
+## Model Notes
+
+- Paperclip exposes Gemini CLI `auto` plus the current general-purpose Gemini text model ids as of March 2026: `gemini-3.1-pro-preview`, `gemini-3-flash-preview`, `gemini-3.1-flash-lite-preview`, `gemini-2.5-pro`, `gemini-2.5-flash`, and `gemini-2.5-flash-lite`.
+- Deprecated ids such as `gemini-3-pro-preview`, `gemini-2.5-flash-preview-09-2025`, `gemini-2.5-flash-lite-preview-09-2025`, and the Gemini 2.0 text variants are intentionally omitted from the fallback list.
+- Gemini 3 preview models may require a current Gemini CLI build and preview access in your Google account or API project.
+- If a preview id is unavailable in your local CLI account, use `auto` or one of the stable Gemini 2.5 models instead.
