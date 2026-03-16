@@ -242,7 +242,7 @@ export function registerIssueCommands(program: Command): void {
       .command("checkout")
       .description("Checkout issue for an agent")
       .argument("<issueId>", "Issue ID")
-      .requiredOption("--agent-id <id>", "Agent ID")
+      .option("--agent-id <id>", "Agent ID (defaults to $PAPERCLIP_AGENT_ID)")
       .option(
         "--expected-statuses <csv>",
         "Expected current statuses",
@@ -251,8 +251,12 @@ export function registerIssueCommands(program: Command): void {
       .action(async (issueId: string, opts: IssueCheckoutOptions) => {
         try {
           const ctx = resolveCommandContext(opts);
+          const agentId = opts.agentId?.trim() || process.env.PAPERCLIP_AGENT_ID?.trim();
+          if (!agentId) {
+            throw new Error("Agent ID is required. Pass --agent-id or set PAPERCLIP_AGENT_ID.");
+          }
           const payload = checkoutIssueSchema.parse({
-            agentId: opts.agentId,
+            agentId,
             expectedStatuses: parseCsv(opts.expectedStatuses),
           });
           const updated = await ctx.api.post<Issue>(`/api/issues/${issueId}/checkout`, payload);
@@ -277,6 +281,117 @@ export function registerIssueCommands(program: Command): void {
           handleCommandError(err);
         }
       }),
+  );
+
+  addCommonClientOptions(
+    issue
+      .command("stalled")
+      .description("List stalled issues (in_progress or blocked with no recent updates)")
+      .requiredOption("-C, --company-id <id>", "Company ID")
+      .option("--threshold <minutes>", "Minutes since last update to consider stalled", "60")
+      .option("--assignee-agent-id <id>", "Filter by assignee agent ID")
+      .option("--project-id <id>", "Filter by project ID")
+      .action(async (opts: IssueBaseOptions & { threshold?: string }) => {
+        try {
+          const ctx = resolveCommandContext(opts, { requireCompany: true });
+          const params = new URLSearchParams({ status: "in_progress,blocked" });
+          if (opts.assigneeAgentId) params.set("assigneeAgentId", opts.assigneeAgentId);
+          if (opts.projectId) params.set("projectId", opts.projectId);
+
+          const rows = (await ctx.api.get<Issue[]>(
+            `/api/companies/${ctx.companyId}/issues?${params.toString()}`,
+          )) ?? [];
+
+          const thresholdMin = Number(opts.threshold) || 60;
+          const cutoff = Date.now() - thresholdMin * 60 * 1000;
+          const stalled = rows.filter((row) => {
+            const updated = new Date(row.updatedAt).getTime();
+            return updated < cutoff;
+          });
+
+          if (ctx.json) {
+            printOutput(
+              stalled.map((row) => ({
+                ...row,
+                stalledMinutes: Math.round((Date.now() - new Date(row.updatedAt).getTime()) / 60000),
+              })),
+              { json: true },
+            );
+            return;
+          }
+
+          if (stalled.length === 0) {
+            console.log("No stalled issues found.");
+            return;
+          }
+
+          for (const row of stalled) {
+            const mins = Math.round((Date.now() - new Date(row.updatedAt).getTime()) / 60000);
+            const age = mins >= 60 ? `${Math.round(mins / 60)}h` : `${mins}m`;
+            console.log(
+              formatInlineRecord({
+                identifier: row.identifier,
+                status: row.status,
+                stalled: age,
+                assignee: row.assigneeAgentId ?? "-",
+                title: row.title,
+              }),
+            );
+          }
+        } catch (err) {
+          handleCommandError(err);
+        }
+      }),
+    { includeCompany: false },
+  );
+
+  addCommonClientOptions(
+    issue
+      .command("search")
+      .description("Search issues by text (title, identifier, description, comments)")
+      .requiredOption("-C, --company-id <id>", "Company ID")
+      .argument("<query>", "Search query text")
+      .option("--status <csv>", "Comma-separated statuses to filter")
+      .option("--assignee-agent-id <id>", "Filter by assignee agent ID")
+      .option("--project-id <id>", "Filter by project ID")
+      .action(async (query: string, opts: IssueBaseOptions) => {
+        try {
+          const ctx = resolveCommandContext(opts, { requireCompany: true });
+          const params = new URLSearchParams({ q: query });
+          if (opts.status) params.set("status", opts.status);
+          if (opts.assigneeAgentId) params.set("assigneeAgentId", opts.assigneeAgentId);
+          if (opts.projectId) params.set("projectId", opts.projectId);
+
+          const rows = (await ctx.api.get<Issue[]>(
+            `/api/companies/${ctx.companyId}/issues?${params.toString()}`,
+          )) ?? [];
+
+          if (ctx.json) {
+            printOutput(rows, { json: true });
+            return;
+          }
+
+          if (rows.length === 0) {
+            printOutput([], { json: false });
+            return;
+          }
+
+          for (const item of rows) {
+            console.log(
+              formatInlineRecord({
+                identifier: item.identifier,
+                id: item.id,
+                status: item.status,
+                priority: item.priority,
+                title: item.title,
+              }),
+            );
+          }
+        } catch (err) {
+          handleCommandError(err);
+        }
+      }),
+    { includeCompany: false },
   );
 }
 

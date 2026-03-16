@@ -4,6 +4,7 @@ import {
   removeMaintainerOnlySkillSymlinks,
   resolvePaperclipSkillsDir,
 } from "@paperclipai/adapter-utils/server-utils";
+import { deriveAgentUrlKey } from "@paperclipai/shared/agent-url-key";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -145,14 +146,21 @@ function buildAgentEnvExports(input: {
   apiBase: string;
   companyId: string;
   agentId: string;
+  agentName?: string;
+  agentUrlKey?: string;
   apiKey: string;
 }): string {
   const escaped = (value: string) => value.replace(/'/g, "'\"'\"'");
+  const agentHome = path.join(
+    "/home/ubuntu/agents",
+    deriveAgentUrlKey(input.agentUrlKey ?? input.agentName, input.agentId),
+  );
   return [
     `export PAPERCLIP_API_URL='${escaped(input.apiBase)}'`,
     `export PAPERCLIP_COMPANY_ID='${escaped(input.companyId)}'`,
     `export PAPERCLIP_AGENT_ID='${escaped(input.agentId)}'`,
     `export PAPERCLIP_API_KEY='${escaped(input.apiKey)}'`,
+    `export AGENT_HOME='${escaped(agentHome)}'`,
   ].join("\n");
 }
 
@@ -265,6 +273,8 @@ export function registerAgentCommands(program: Command): void {
             apiBase: ctx.api.apiBase,
             companyId: agentRow.companyId,
             agentId: agentRow.id,
+            agentName: agentRow.name,
+            agentUrlKey: agentRow.urlKey,
             apiKey: key.token,
           });
 
@@ -306,6 +316,86 @@ export function registerAgentCommands(program: Command): void {
           console.log("");
           console.log("# Run this in your shell before launching codex/claude:");
           console.log(exportsText);
+        } catch (err) {
+          handleCommandError(err);
+        }
+      }),
+    { includeCompany: false },
+  );
+
+  addCommonClientOptions(
+    agent
+      .command("wake")
+      .description("Force wake an agent (trigger a heartbeat)")
+      .argument("<agentRef>", "Agent ID or shortname/url-key")
+      .option("-C, --company-id <id>", "Company ID (for name resolution)")
+      .option("--message <text>", "Reason/message for the wakeup")
+      .option(
+        "--source <source>",
+        "Invocation source (on_demand, timer, assignment, automation)",
+        "on_demand",
+      )
+      .option(
+        "--trigger <trigger>",
+        "Trigger detail (manual, ping, callback, system)",
+        "manual",
+      )
+      .action(async (agentRef: string, opts: BaseClientOptions & {
+        message?: string;
+        source?: string;
+        trigger?: string;
+      }) => {
+        try {
+          const ctx = resolveCommandContext(opts);
+
+          // Resolve agent ID — if agentRef looks like a UUID, use it directly; otherwise look it up
+          let agentId = agentRef;
+          if (!/^[0-9a-f]{8}-/.test(agentRef) && agentRef !== "me") {
+            const companyId =
+              opts.companyId?.trim() ||
+              process.env.PAPERCLIP_COMPANY_ID?.trim();
+            if (!companyId) {
+              throw new Error(
+                "Company ID required for name-based agent lookup. Pass -C or set PAPERCLIP_COMPANY_ID.",
+              );
+            }
+            const query = new URLSearchParams({ companyId });
+            const agentRow = await ctx.api.get<Agent>(
+              `/api/agents/${encodeURIComponent(agentRef)}?${query.toString()}`,
+            );
+            if (!agentRow) {
+              throw new Error(`Agent not found: ${agentRef}`);
+            }
+            agentId = agentRow.id;
+          }
+
+          const payload: Record<string, unknown> = {
+            source: opts.source ?? "on_demand",
+            triggerDetail: opts.trigger ?? "manual",
+          };
+          if (opts.message) {
+            payload.reason = opts.message;
+          }
+
+          const result = await ctx.api.post<Record<string, unknown>>(
+            `/api/agents/${agentId}/wakeup`,
+            payload,
+          );
+
+          if (ctx.json) {
+            printOutput(result, { json: true });
+            return;
+          }
+
+          if (result && (result as Record<string, unknown>).status === "skipped") {
+            console.log(`Wakeup skipped for ${agentRef} (agent may already be running).`);
+          } else if (result && (result as Record<string, unknown>).id) {
+            console.log(
+              `Wakeup triggered for ${agentRef}: run=${(result as Record<string, unknown>).id} status=${(result as Record<string, unknown>).status}`,
+            );
+          } else {
+            printOutput(result, { json: false });
+          }
         } catch (err) {
           handleCommandError(err);
         }
