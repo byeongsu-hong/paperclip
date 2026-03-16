@@ -69,7 +69,10 @@ export function resolveCommandContext(
     );
   }
 
-  const api = new PaperclipApiClient({ apiBase, apiKey });
+  const runId =
+    process.env.PAPERCLIP_RUN_ID?.trim() || undefined;
+
+  const api = new PaperclipApiClient({ apiBase, apiKey, runId });
   return {
     api,
     companyId,
