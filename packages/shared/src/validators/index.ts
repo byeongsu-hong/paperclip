@@ -59,6 +59,10 @@ export {
 
 export {
   createIssueSchema,
+  issueIntakeDraftRecommendationSchema,
+  issueIntakeDraftNodeSchema,
+  issueIntakeDraftSchema,
+  createIssueIntakeDraftSchema,
   createIssueLabelSchema,
   updateIssueSchema,
   issueExecutionWorkspaceSettingsSchema,
@@ -70,6 +74,10 @@ export {
   issueDocumentKeySchema,
   upsertIssueDocumentSchema,
   type CreateIssue,
+  type IssueIntakeDraftRecommendationInput,
+  type IssueIntakeDraftNodeInput,
+  type IssueIntakeDraftInput,
+  type CreateIssueIntakeDraft,
   type CreateIssueLabel,
   type UpdateIssue,
   type IssueExecutionWorkspaceSettings,
@@ -93,11 +101,15 @@ export {
   resolveApprovalSchema,
   requestApprovalRevisionSchema,
   resubmitApprovalSchema,
+  issueIntakePlanPayloadSchema,
+  updateApprovalPayloadSchema,
   addApprovalCommentSchema,
   type CreateApproval,
   type ResolveApproval,
   type RequestApprovalRevision,
   type ResubmitApproval,
+  type IssueIntakePlanPayloadInput,
+  type UpdateApprovalPayload,
   type AddApprovalComment,
 } from "./approval.js";
 

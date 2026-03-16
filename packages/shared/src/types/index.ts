@@ -22,6 +22,9 @@ export type {
 export type {
   Issue,
   IssueAssigneeAdapterOverrides,
+  IssueIntakeDraft,
+  IssueIntakeDraftNode,
+  IssueIntakeDraftRecommendation,
   IssueComment,
   IssueDocument,
   IssueDocumentSummary,
@@ -35,7 +38,12 @@ export type {
   IssueLabel,
 } from "./issue.js";
 export type { Goal } from "./goal.js";
-export type { Approval, ApprovalComment } from "./approval.js";
+export type {
+  Approval,
+  ApprovalComment,
+  IssueIntakePlanMaterialization,
+  IssueIntakePlanPayload,
+} from "./approval.js";
 export type {
   SecretProvider,
   SecretVersionSelector,

@@ -3,6 +3,7 @@ import type { Db } from "@paperclipai/db";
 import {
   addApprovalCommentSchema,
   createApprovalSchema,
+  updateApprovalPayloadSchema,
   requestApprovalRevisionSchema,
   resolveApprovalSchema,
   resubmitApprovalSchema,
@@ -18,6 +19,7 @@ import {
 } from "../services/index.js";
 import { assertBoard, assertCompanyAccess, getActorInfo } from "./authz.js";
 import { redactEventPayload } from "../redaction.js";
+import { materializeIssueIntakePlan } from "../services/issue-intake.js";
 
 function redactApprovalPayload<T extends { payload: Record<string, unknown> }>(approval: T): T {
   return {
@@ -116,6 +118,48 @@ export function approvalRoutes(db: Db) {
     assertCompanyAccess(req, approval.companyId);
     const issues = await issueApprovalsSvc.listIssuesForApproval(id);
     res.json(issues);
+  });
+
+  router.patch("/approvals/:id", validate(updateApprovalPayloadSchema), async (req, res) => {
+    assertBoard(req);
+    const id = req.params.id as string;
+    const existing = await svc.getById(id);
+    if (!existing) {
+      res.status(404).json({ error: "Approval not found" });
+      return;
+    }
+    assertCompanyAccess(req, existing.companyId);
+    if (existing.type !== "issue_intake_plan") {
+      res.status(422).json({ error: "Only intake approvals support payload editing" });
+      return;
+    }
+
+    const currentPayload = existing.payload as Record<string, unknown>;
+    if (currentPayload.sourceIssueId !== req.body.payload.sourceIssueId) {
+      res.status(422).json({ error: "sourceIssueId cannot change" });
+      return;
+    }
+
+    const approval = await svc.updatePayload(id, req.body.payload);
+    const actor = getActorInfo(req);
+
+    if (req.body.note) {
+      await svc.addComment(id, req.body.note, { userId: req.actor.userId ?? undefined });
+    }
+
+    await logActivity(db, {
+      companyId: approval.companyId,
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      agentId: actor.agentId,
+      runId: actor.runId,
+      action: "approval.payload_updated",
+      entityType: "approval",
+      entityId: approval.id,
+      details: { type: approval.type, noted: Boolean(req.body.note) },
+    });
+
+    res.json(redactApprovalPayload(approval));
   });
 
   router.post("/approvals/:id/approve", validate(resolveApprovalSchema), async (req, res) => {
@@ -235,6 +279,77 @@ export function approvalRoutes(db: Db) {
     }
 
     res.json(redactApprovalPayload(approval));
+  });
+
+  router.post("/approvals/:id/materialize-intake", async (req, res) => {
+    assertBoard(req);
+    const id = req.params.id as string;
+    const existing = await svc.getById(id);
+    if (!existing) {
+      res.status(404).json({ error: "Approval not found" });
+      return;
+    }
+    assertCompanyAccess(req, existing.companyId);
+
+    const actor = getActorInfo(req);
+    const result = await materializeIssueIntakePlan(db, id, {
+      agentId: actor.agentId,
+      userId: req.actor.userId ?? null,
+    });
+
+    if (result.applied) {
+      await logActivity(db, {
+        companyId: result.approval.companyId,
+        actorType: actor.actorType,
+        actorId: actor.actorId,
+        agentId: actor.agentId,
+        runId: actor.runId,
+        action: "approval.intake_materialized",
+        entityType: "approval",
+        entityId: result.approval.id,
+        details: {
+          issueIds: result.issues.map((issue) => issue.id),
+          sourceIssueId: result.issues[0]?.id ?? null,
+        },
+      });
+
+      const wakeups = new Map<string, { issueId: string }>();
+      for (const issue of result.issues) {
+        if (!issue.assigneeAgentId || issue.status === "backlog") continue;
+        if (!wakeups.has(issue.assigneeAgentId)) {
+          wakeups.set(issue.assigneeAgentId, { issueId: issue.id });
+        }
+      }
+
+      for (const [agentId, wakeup] of wakeups.entries()) {
+        void heartbeat
+          .wakeup(agentId, {
+            source: "assignment",
+            triggerDetail: "system",
+            reason: "issue_assigned",
+            payload: { issueId: wakeup.issueId, approvalId: result.approval.id, mutation: "intake_materialize" },
+            requestedByActorType: actor.actorType,
+            requestedByActorId: actor.actorId,
+            contextSnapshot: {
+              issueId: wakeup.issueId,
+              approvalId: result.approval.id,
+              source: "approval.intake_materialize",
+            },
+          })
+          .catch(() => {});
+      }
+    }
+
+    const linkedIssues = result.applied
+      ? result.issues
+      : await issueApprovalsSvc.listIssuesForApproval(id);
+
+    const hydratedApproval = await svc.getById(id);
+    res.json({
+      approval: redactApprovalPayload(hydratedApproval ?? result.approval),
+      issues: linkedIssues,
+      applied: result.applied,
+    });
   });
 
   router.post(

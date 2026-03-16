@@ -338,6 +338,7 @@ function buildPaperclipEnvForWake(ctx: AdapterExecutionContext, wakePayload: Wak
 function buildWakeText(payload: WakePayload, paperclipEnv: Record<string, string>): string {
   const claimedApiKeyPath = "~/.openclaw/workspace/paperclip-claimed-api-key.json";
   const orderedKeys = [
+    "AGENT_HOME",
     "PAPERCLIP_RUN_ID",
     "PAPERCLIP_AGENT_ID",
     "PAPERCLIP_COMPANY_ID",
@@ -368,6 +369,8 @@ function buildWakeText(payload: WakePayload, paperclipEnv: Record<string, string
     "Set these values in your run context:",
     ...envLines,
     `PAPERCLIP_API_KEY=<token from ${claimedApiKeyPath}>`,
+    "",
+    "Use AGENT_HOME as your home directory for personal memory, plans, and agent-local files.",
     "",
     `Load PAPERCLIP_API_KEY from ${claimedApiKeyPath} (the token you saved after claim-api-key).`,
     "",

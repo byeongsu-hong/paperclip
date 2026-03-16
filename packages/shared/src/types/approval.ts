@@ -15,6 +15,23 @@ export interface Approval {
   updatedAt: Date;
 }
 
+export interface IssueIntakePlanMaterialization {
+  appliedAt: string;
+  sourceIssueId: string;
+  createdIssueIds: string[];
+}
+
+export interface IssueIntakePlanPayload {
+  version: 1;
+  sourceIssueId: string;
+  rawRequest: {
+    title: string;
+    description: string | null;
+  };
+  proposal: import("./issue.js").IssueIntakeDraft;
+  materialization?: IssueIntakePlanMaterialization | null;
+}
+
 export interface ApprovalComment {
   id: string;
   companyId: string;
