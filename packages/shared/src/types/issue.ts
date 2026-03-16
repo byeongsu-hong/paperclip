@@ -50,7 +50,6 @@ export interface IssueAssigneeAdapterOverrides {
   useProjectWorkspace?: boolean;
 }
 
-<<<<<<< HEAD
 export type DocumentFormat = "markdown";
 
 export interface IssueDocumentSummary {

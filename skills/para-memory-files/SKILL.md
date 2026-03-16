@@ -101,4 +101,36 @@ Vectors + BM25 + reranking finds things even when the wording differs.
 
 ## Planning
 
-Keep plans in timestamped files in `plans/` at the project root (outside personal memory so other agents can access them). Use `qmd` to search plans. Plans go stale -- if a newer plan exists, do not confuse yourself with an older version. If you notice staleness, update the file to note what it is supersededBy.
+Keep shared plans in timestamped files in `plans/` at the project root (outside personal memory so other agents can access them).
+
+Before drafting a new plan or revising an existing one:
+
+1. Use `qmd` against the shared `plans` collection first.
+2. Query the active issue identifier when one exists.
+3. Query adjacent project, goal, or topic terms.
+4. Read the newest relevant plan before writing.
+5. Only then draft or revise the plan.
+
+Use `qmd` rather than manual path browsing:
+
+```bash
+qmd search "MIT-15" --collection plans -n 5
+qmd search "mitosis automation" --collection plans -n 5
+qmd query "latest Mitosis plan" --json -n 3
+```
+
+Shared plans should follow the `plans/README.md` metadata standard:
+
+- `Status`
+- `Date`
+- `Owner`
+- `Issue` when tied to a Paperclip issue
+- optional `Goal`, `Context`, `Supersedes`, `SupersededBy`
+
+Plan freshness must be explicit. If a plan is replaced or no longer the operative document, update it to point at the newer file with `SupersededBy` or mark the current file's `Supersedes`.
+
+Memory indexing boundary:
+
+- Index shared planning artifacts in `plans/` by default.
+- Do not index agent personal memory folders for planning retrieval unless that agent's instructions explicitly permit it.
+- When in doubt, keep personal memory private and rely on shared plan files instead.
