@@ -210,6 +210,7 @@ export function IssueDetail() {
   });
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [attachmentDragActive, setAttachmentDragActive] = useState(false);
+  const [intakeError, setIntakeError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const lastMarkedReadIssueIdRef = useRef<string | null>(null);
 
@@ -361,6 +362,17 @@ export function IssueDetail() {
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }, [allIssues, issue]);
 
+  const activeIntakeApproval = useMemo(
+    () =>
+      (linkedApprovals ?? []).find(
+        (approval) =>
+          approval.type === "issue_intake_plan" &&
+          approval.status !== "rejected" &&
+          approval.status !== "cancelled",
+      ) ?? null,
+    [linkedApprovals],
+  );
+
   const commentReassignOptions = useMemo(() => {
     const options: Array<{ id: string; label: string; searchText?: string }> = [];
     const activeAgents = [...(agents ?? [])]
@@ -483,6 +495,19 @@ export function IssueDetail() {
     onSuccess: () => {
       invalidateIssue();
       queryClient.invalidateQueries({ queryKey: queryKeys.issues.comments(issueId!) });
+    },
+  });
+
+  const createIntakeDraft = useMutation({
+    mutationFn: () => issuesApi.createIntakeDraft(issueId!),
+    onSuccess: (approval) => {
+      setIntakeError(null);
+      invalidateIssue();
+      queryClient.invalidateQueries({ queryKey: queryKeys.approvals.detail(approval.id) });
+      navigate(`/approvals/${approval.id}`);
+    },
+    onError: (err) => {
+      setIntakeError(err instanceof Error ? err.message : "Intake draft failed");
     },
   });
 
@@ -612,6 +637,9 @@ export function IssueDetail() {
 
   // Ancestors are returned oldest-first from the server (root at end, immediate parent at start)
   const ancestors = issue.ancestors ?? [];
+  const canCreateIntakeDraft = Boolean(session && !issue.parentId && !activeIntakeApproval);
+
+
   const handleFilePicked = async (evt: ChangeEvent<HTMLInputElement>) => {
     const files = evt.target.files;
     if (!files || files.length === 0) return;
@@ -844,6 +872,39 @@ export function IssueDetail() {
             return attachment.contentPath;
           }}
         />
+
+        {(canCreateIntakeDraft || activeIntakeApproval || intakeError) && (
+          <div className="rounded-lg border border-border/70 bg-muted/20 px-4 py-3 space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">Issue intake review</p>
+                <p className="text-xs text-muted-foreground">
+                  Generate a review-first decomposition for this raw issue, then finalize it in approvals.
+                </p>
+              </div>
+              {activeIntakeApproval ? (
+                <Button size="sm" variant="outline" onClick={() => navigate(`/approvals/${activeIntakeApproval.id}`)}>
+                  Open intake review
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => createIntakeDraft.mutate()}
+                  disabled={!canCreateIntakeDraft || createIntakeDraft.isPending}
+                >
+                  {createIntakeDraft.isPending ? "Generating..." : "Generate intake draft"}
+                </Button>
+              )}
+            </div>
+            {activeIntakeApproval && (
+              <p className="text-[11px] text-muted-foreground">
+                Active intake approval: {activeIntakeApproval.status.replace(/_/g, " ")}.
+              </p>
+            )}
+            {intakeError && <p className="text-xs text-destructive">{intakeError}</p>}
+          </div>
+        )}
       </div>
 
       <PluginSlotOutlet

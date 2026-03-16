@@ -97,4 +97,6 @@ export const issuesApi = {
   updateWorkProduct: (id: string, data: Record<string, unknown>) =>
     api.patch<IssueWorkProduct>(`/work-products/${id}`, data),
   deleteWorkProduct: (id: string) => api.delete<IssueWorkProduct>(`/work-products/${id}`),
+  createIntakeDraft: (id: string, data: Record<string, unknown> = {}) =>
+    api.post<Approval>(`/issues/${id}/intake-draft`, data),
 };
