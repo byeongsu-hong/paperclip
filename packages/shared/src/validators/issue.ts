@@ -56,6 +56,46 @@ export const createIssueSchema = z.object({
 
 export type CreateIssue = z.infer<typeof createIssueSchema>;
 
+export const issueIntakeDraftRecommendationSchema = z.object({
+  id: z.string().nullable(),
+  label: z.string().nullable(),
+  rationale: z.string(),
+});
+
+export const issueIntakeDraftNodeSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().nullable(),
+  status: z.enum(ISSUE_STATUSES),
+  priority: z.enum(ISSUE_PRIORITIES),
+  projectId: z.string().uuid().nullable(),
+  projectLabel: z.string().nullable(),
+  goal: issueIntakeDraftRecommendationSchema,
+  assignee: issueIntakeDraftRecommendationSchema,
+  sourceExcerpt: z.string().nullable(),
+  requestDepth: z.number().int().nonnegative(),
+});
+
+export const issueIntakeDraftSchema = z.object({
+  parent: issueIntakeDraftNodeSchema,
+  children: z.array(issueIntakeDraftNodeSchema).min(1).max(5),
+  notes: z.array(z.string()),
+});
+
+export const createIssueIntakeDraftSchema = z.object({
+  title: z.string().trim().min(1).optional(),
+  description: z.string().optional().nullable(),
+  projectId: z.string().uuid().optional().nullable(),
+  goalId: z.string().uuid().optional().nullable(),
+  assigneeAgentId: z.string().uuid().optional().nullable(),
+  priority: z.enum(ISSUE_PRIORITIES).optional(),
+  status: z.enum(ISSUE_STATUSES).optional(),
+});
+
+export type CreateIssueIntakeDraft = z.infer<typeof createIssueIntakeDraftSchema>;
+export type IssueIntakeDraftRecommendationInput = z.infer<typeof issueIntakeDraftRecommendationSchema>;
+export type IssueIntakeDraftNodeInput = z.infer<typeof issueIntakeDraftNodeSchema>;
+export type IssueIntakeDraftInput = z.infer<typeof issueIntakeDraftSchema>;
+
 export const createIssueLabelSchema = z.object({
   name: z.string().trim().min(1).max(48),
   color: z.string().regex(/^#(?:[0-9a-fA-F]{6})$/, "Color must be a 6-digit hex value"),

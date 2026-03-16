@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { models as codexFallbackModels } from "@paperclipai/adapter-codex-local";
 import { models as cursorFallbackModels } from "@paperclipai/adapter-cursor-local";
+import { models as geminiFallbackModels } from "@paperclipai/adapter-gemini-local";
 import { resetOpenCodeModelsCacheForTests } from "@paperclipai/adapter-opencode-local/server";
 import { listAdapterModels } from "../adapters/index.js";
 import { resetCodexModelsCacheForTests } from "../adapters/codex-models.js";
@@ -63,6 +64,17 @@ describe("adapter model listing", () => {
     expect(models).toEqual(codexFallbackModels);
   });
 
+  it("returns static gemini models including current Gemini 3.x previews", async () => {
+    const models = await listAdapterModels("gemini_local");
+
+    expect(models).toEqual(geminiFallbackModels);
+    expect(models.some((model) => model.id === "gemini-3.1-pro-preview")).toBe(true);
+    expect(models.some((model) => model.id === "gemini-3-flash-preview")).toBe(true);
+    expect(models.some((model) => model.id === "gemini-3.1-flash-lite-preview")).toBe(true);
+    expect(models.some((model) => model.id === "gemini-2.5-flash")).toBe(true);
+    expect(models.some((model) => model.id === "gemini-3-pro-preview")).toBe(false);
+    expect(models.some((model) => model.id === "gemini-2.5-flash-preview-09-2025")).toBe(false);
+  });
 
   it("returns cursor fallback models when CLI discovery is unavailable", async () => {
     setCursorModelsRunnerForTests(() => ({

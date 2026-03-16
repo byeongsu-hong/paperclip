@@ -228,6 +228,26 @@ export function approvalService(db: Db) {
         .then((rows) => rows[0]);
     },
 
+    updatePayload: async (id: string, payload: Record<string, unknown>) => {
+      const existing = await getExistingApproval(id);
+      if (existing.type !== "issue_intake_plan") {
+        throw unprocessable("Only issue intake approvals support payload edits");
+      }
+      if (existing.status !== "pending" && existing.status !== "revision_requested") {
+        throw unprocessable("Only pending or revision requested intake approvals can be edited");
+      }
+
+      return db
+        .update(approvals)
+        .set({
+          payload,
+          updatedAt: new Date(),
+        })
+        .where(eq(approvals.id, id))
+        .returning()
+        .then((rows) => rows[0]);
+    },
+
     listComments: async (approvalId: string) => {
       const existing = await getExistingApproval(approvalId);
       return db

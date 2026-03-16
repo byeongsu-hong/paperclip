@@ -5,6 +5,7 @@ import {
   addIssueCommentSchema,
   createIssueAttachmentMetadataSchema,
   createIssueWorkProductSchema,
+  createIssueIntakeDraftSchema,
   createIssueLabelSchema,
   checkoutIssueSchema,
   createIssueSchema,
@@ -34,6 +35,9 @@ import { forbidden, HttpError, unauthorized } from "../errors.js";
 import { assertCompanyAccess, getActorInfo } from "./authz.js";
 import { shouldWakeAssigneeOnCheckout } from "./issues-checkout-wakeup.js";
 import { isAllowedContentType, MAX_ATTACHMENT_BYTES } from "../attachment-types.js";
+import { redactEventPayload } from "../redaction.js";
+import { buildIssueIntakePlanPayload } from "../services/issue-intake.js";
+import { approvalService } from "../services/approvals.js";
 
 const MAX_ISSUE_COMMENT_LIMIT = 500;
 
@@ -49,6 +53,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
   const executionWorkspacesSvc = executionWorkspaceService(db);
   const workProductsSvc = workProductService(db);
   const documentsSvc = documentService(db);
+  const approvalsSvc = approvalService(db);
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: MAX_ATTACHMENT_BYTES, files: 1 },
@@ -719,6 +724,67 @@ export function issueRoutes(db: Db, storage: StorageService) {
 
     const approvals = await issueApprovalsSvc.listApprovalsForIssue(id);
     res.status(201).json(approvals);
+  });
+
+  router.post("/issues/:id/intake-draft", validate(createIssueIntakeDraftSchema), async (req, res) => {
+    const id = req.params.id as string;
+    const issue = await svc.getById(id);
+    if (!issue) {
+      res.status(404).json({ error: "Issue not found" });
+      return;
+    }
+    assertCompanyAccess(req, issue.companyId);
+    if (req.actor.type !== "board") {
+      res.status(403).json({ error: "Board authentication required" });
+      return;
+    }
+
+    const linkedApprovals = await issueApprovalsSvc.listApprovalsForIssue(id);
+    const activeIntakeApproval = linkedApprovals.find(
+      (approval) =>
+        approval.type === "issue_intake_plan" &&
+        (approval.status === "pending" || approval.status === "revision_requested" || approval.status === "approved"),
+    );
+    if (activeIntakeApproval) {
+      res.status(409).json({ error: "This issue already has an intake draft approval", approvalId: activeIntakeApproval.id });
+      return;
+    }
+
+    const actor = getActorInfo(req);
+    const payload = await buildIssueIntakePlanPayload(db, id, req.body);
+    const approval = await approvalsSvc.create(issue.companyId, {
+      type: "issue_intake_plan",
+      payload: payload as unknown as Record<string, unknown>,
+      requestedByAgentId: actor.agentId,
+      requestedByUserId: req.actor.userId ?? null,
+      status: "pending",
+      decisionNote: null,
+      decidedByUserId: null,
+      decidedAt: null,
+      updatedAt: new Date(),
+    });
+
+    await issueApprovalsSvc.link(id, approval.id, {
+      agentId: actor.agentId,
+      userId: req.actor.userId ?? null,
+    });
+
+    await logActivity(db, {
+      companyId: issue.companyId,
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      agentId: actor.agentId,
+      runId: actor.runId,
+      action: "approval.created",
+      entityType: "approval",
+      entityId: approval.id,
+      details: { type: approval.type, issueIds: [issue.id] },
+    });
+
+    res.status(201).json({
+      ...approval,
+      payload: redactEventPayload(approval.payload) ?? {},
+    });
   });
 
   router.delete("/issues/:id/approvals/:approvalId", async (req, res) => {

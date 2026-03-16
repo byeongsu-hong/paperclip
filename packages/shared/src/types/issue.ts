@@ -51,6 +51,7 @@ export interface IssueAssigneeAdapterOverrides {
   useProjectWorkspace?: boolean;
 }
 
+<<<<<<< HEAD
 export type DocumentFormat = "markdown";
 
 export interface IssueDocumentSummary {
@@ -92,6 +93,31 @@ export interface LegacyPlanDocument {
   key: "plan";
   body: string;
   source: "issue_description";
+}
+
+export interface IssueIntakeDraftRecommendation {
+  id: string | null;
+  label: string | null;
+  rationale: string;
+}
+
+export interface IssueIntakeDraftNode {
+  title: string;
+  description: string | null;
+  status: IssueStatus;
+  priority: IssuePriority;
+  projectId: string | null;
+  projectLabel: string | null;
+  goal: IssueIntakeDraftRecommendation;
+  assignee: IssueIntakeDraftRecommendation;
+  sourceExcerpt: string | null;
+  requestDepth: number;
+}
+
+export interface IssueIntakeDraft {
+  parent: IssueIntakeDraftNode;
+  children: IssueIntakeDraftNode[];
+  notes: string[];
 }
 
 export interface Issue {

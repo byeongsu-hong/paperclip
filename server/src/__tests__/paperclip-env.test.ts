@@ -55,4 +55,15 @@ describe("buildPaperclipEnv", () => {
 
     expect(env.PAPERCLIP_API_URL).toBe("http://[::1]:3101");
   });
+
+  it("injects AGENT_HOME using the agent url key", () => {
+    const env = buildPaperclipEnv({
+      id: "agent-1",
+      companyId: "company-1",
+      name: "Claude Dev",
+      urlKey: "claude-dev",
+    });
+
+    expect(env.AGENT_HOME).toBe("/home/ubuntu/agents/claude-dev");
+  });
 });
