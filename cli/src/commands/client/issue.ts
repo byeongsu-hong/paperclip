@@ -4,9 +4,14 @@ import {
   checkoutIssueSchema,
   createIssueSchema,
   updateIssueSchema,
+  upsertIssueDocumentSchema,
   type Issue,
   type IssueComment,
+  type IssueDocument,
+  type IssueDocumentSummary,
 } from "@paperclipai/shared";
+import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import {
   addCommonClientOptions,
   formatInlineRecord,
@@ -54,6 +59,13 @@ interface IssueUpdateOptions extends BaseClientOptions {
 interface IssueCommentOptions extends BaseClientOptions {
   body: string;
   reopen?: boolean;
+}
+
+interface IssueDocumentPutOptions extends BaseClientOptions {
+  title?: string;
+  body?: string;
+  bodyFile?: string;
+  format?: string;
 }
 
 interface IssueCheckoutOptions extends BaseClientOptions {
@@ -392,6 +404,108 @@ export function registerIssueCommands(program: Command): void {
         }
       }),
     { includeCompany: false },
+  );
+
+  // ── document subcommands ──────────────────────────────────────────────────
+
+  const doc = issue.command("document").description("Issue document operations");
+
+  addCommonClientOptions(
+    doc
+      .command("list")
+      .description("List documents for an issue")
+      .argument("<issueId>", "Issue ID or identifier")
+      .action(async (issueId: string, opts: BaseClientOptions) => {
+        try {
+          const ctx = resolveCommandContext(opts);
+          const docs = await ctx.api.get<IssueDocumentSummary[]>(`/api/issues/${issueId}/documents`);
+          if (ctx.json) {
+            printOutput(docs, { json: true });
+            return;
+          }
+          const rows = docs ?? [];
+          if (rows.length === 0) {
+            console.log("No documents.");
+            return;
+          }
+          for (const d of rows) {
+            console.log(formatInlineRecord({ key: d.key, title: d.title ?? "", format: d.format, updatedAt: d.updatedAt }));
+          }
+        } catch (err) {
+          handleCommandError(err);
+        }
+      }),
+  );
+
+  addCommonClientOptions(
+    doc
+      .command("get")
+      .description("Get a document by key")
+      .argument("<issueId>", "Issue ID or identifier")
+      .argument("<key>", "Document key (e.g. plan)")
+      .action(async (issueId: string, key: string, opts: BaseClientOptions) => {
+        try {
+          const ctx = resolveCommandContext(opts);
+          const document = await ctx.api.get<IssueDocument>(`/api/issues/${issueId}/documents/${key}`);
+          if (ctx.json) {
+            printOutput(document, { json: true });
+            return;
+          }
+          console.log(document?.body ?? "");
+        } catch (err) {
+          handleCommandError(err);
+        }
+      }),
+  );
+
+  addCommonClientOptions(
+    doc
+      .command("put")
+      .description("Create or update a document")
+      .argument("<issueId>", "Issue ID or identifier")
+      .argument("<key>", "Document key (e.g. plan)")
+      .option("--title <string>", "Document title (required on create)")
+      .option("--body <string>", "Document body content (use - to read from stdin)")
+      .option("--body-file <path>", "Read body from file")
+      .option("--format <format>", "Document format: markdown|text", "markdown")
+      .action(async (issueId: string, key: string, opts: IssueDocumentPutOptions) => {
+        try {
+          const ctx = resolveCommandContext(opts);
+
+          // Resolve body content
+          let body: string;
+          if (opts.bodyFile) {
+            body = await readFile(opts.bodyFile, "utf8");
+          } else if (opts.body === "-") {
+            body = readFileSync(0, "utf8");
+          } else if (opts.body !== undefined) {
+            body = opts.body;
+          } else {
+            throw new Error("One of --body or --body-file is required.");
+          }
+
+          // Fetch existing doc to get baseRevisionId for conflict detection
+          let baseRevisionId: string | null = null;
+          try {
+            const existing = await ctx.api.get<IssueDocument>(`/api/issues/${issueId}/documents/${key}`);
+            baseRevisionId = existing?.latestRevisionId ?? null;
+          } catch {
+            // Doc doesn't exist yet — create path
+          }
+
+          const payload = upsertIssueDocumentSchema.parse({
+            title: opts.title ?? null,
+            format: opts.format ?? "markdown",
+            body,
+            baseRevisionId,
+          });
+
+          const result = await ctx.api.put<IssueDocument>(`/api/issues/${issueId}/documents/${key}`, payload);
+          printOutput(result, { json: ctx.json });
+        } catch (err) {
+          handleCommandError(err);
+        }
+      }),
   );
 }
 
