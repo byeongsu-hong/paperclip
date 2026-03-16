@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import type { Agent } from "@paperclipai/shared";
+import { updateAgentSchema, updateAgentInstructionsPathSchema } from "@paperclipai/shared";
 import {
   removeMaintainerOnlySkillSymlinks,
   resolvePaperclipSkillsDir,
@@ -20,6 +21,27 @@ import {
 
 interface AgentListOptions extends BaseClientOptions {
   companyId?: string;
+}
+
+interface AgentUpdateOptions extends BaseClientOptions {
+  companyId?: string;
+  name?: string;
+  role?: string;
+  title?: string;
+  status?: string;
+  adapterType?: string;
+  adapterConfig?: string;
+  model?: string;
+  runtimeConfig?: string;
+  budgetMonthlyCents?: string;
+  reportsTo?: string;
+  capabilities?: string;
+}
+
+interface AgentSetInstructionsOptions extends BaseClientOptions {
+  companyId?: string;
+  path: string;
+  adapterConfigKey?: string;
 }
 
 interface AgentLocalCliOptions extends BaseClientOptions {
@@ -396,6 +418,119 @@ export function registerAgentCommands(program: Command): void {
           } else {
             printOutput(result, { json: false });
           }
+        } catch (err) {
+          handleCommandError(err);
+        }
+      }),
+    { includeCompany: false },
+  );
+
+  addCommonClientOptions(
+    agent
+      .command("update")
+      .description("Update an agent")
+      .argument("<agentRef>", "Agent ID or url-key")
+      .option("-C, --company-id <id>", "Company ID (for name resolution)")
+      .option("--name <string>", "Agent name")
+      .option("--role <string>", "Agent role")
+      .option("--title <string>", "Agent title")
+      .option("--status <status>", "Agent status (idle|paused|pending_approval|terminated)")
+      .option("--adapter-type <string>", "Adapter type")
+      .option("--adapter-config <json>", "Adapter config JSON (merged into existing)")
+      .option("--model <string>", "Convenience: sets adapterConfig.model")
+      .option("--runtime-config <json>", "Runtime config JSON")
+      .option("--budget-monthly-cents <number>", "Monthly budget in cents")
+      .option("--reports-to <agentId>", "Reports-to agent ID")
+      .option("--capabilities <string>", "Agent capabilities description")
+      .action(async (agentRef: string, opts: AgentUpdateOptions) => {
+        try {
+          const ctx = resolveCommandContext(opts);
+
+          // Resolve agent ID from uuid or url-key
+          let agentId = agentRef;
+          if (!/^[0-9a-f]{8}-/.test(agentRef) && agentRef !== "me") {
+            const companyId = opts.companyId?.trim() || process.env.PAPERCLIP_COMPANY_ID?.trim();
+            if (!companyId) {
+              throw new Error(
+                "Company ID required for name-based agent lookup. Pass -C or set PAPERCLIP_COMPANY_ID.",
+              );
+            }
+            const query = new URLSearchParams({ companyId });
+            const agentRow = await ctx.api.get<Agent>(
+              `/api/agents/${encodeURIComponent(agentRef)}?${query.toString()}`,
+            );
+            if (!agentRow) throw new Error(`Agent not found: ${agentRef}`);
+            agentId = agentRow.id;
+          }
+
+          // Build adapterConfig patch: start from --adapter-config JSON, then apply --model convenience
+          let adapterConfigPatch: Record<string, unknown> | undefined;
+          if (opts.adapterConfig) {
+            adapterConfigPatch = JSON.parse(opts.adapterConfig) as Record<string, unknown>;
+          }
+          if (opts.model) {
+            adapterConfigPatch = { ...(adapterConfigPatch ?? {}), model: opts.model };
+          }
+
+          const payload = updateAgentSchema.parse({
+            name: opts.name,
+            role: opts.role,
+            title: opts.title,
+            status: opts.status,
+            adapterType: opts.adapterType,
+            adapterConfig: adapterConfigPatch,
+            runtimeConfig: opts.runtimeConfig ? (JSON.parse(opts.runtimeConfig) as Record<string, unknown>) : undefined,
+            budgetMonthlyCents: opts.budgetMonthlyCents !== undefined ? Number(opts.budgetMonthlyCents) : undefined,
+            reportsTo: opts.reportsTo,
+            capabilities: opts.capabilities,
+          });
+
+          const updated = await ctx.api.patch<Agent>(`/api/agents/${agentId}`, payload);
+          printOutput(updated, { json: ctx.json });
+        } catch (err) {
+          handleCommandError(err);
+        }
+      }),
+    { includeCompany: false },
+  );
+
+  addCommonClientOptions(
+    agent
+      .command("set-instructions")
+      .description("Set the instructions file path for an agent")
+      .argument("<agentRef>", "Agent ID or url-key")
+      .requiredOption("--path <path>", "Instructions file path (pass 'null' to clear)")
+      .option("-C, --company-id <id>", "Company ID (for name resolution)")
+      .option("--adapter-config-key <key>", "Custom adapterConfig key for the path field")
+      .action(async (agentRef: string, opts: AgentSetInstructionsOptions) => {
+        try {
+          const ctx = resolveCommandContext(opts);
+
+          // Resolve agent ID from uuid or url-key
+          let agentId = agentRef;
+          if (!/^[0-9a-f]{8}-/.test(agentRef) && agentRef !== "me") {
+            const companyId = opts.companyId?.trim() || process.env.PAPERCLIP_COMPANY_ID?.trim();
+            if (!companyId) {
+              throw new Error(
+                "Company ID required for name-based agent lookup. Pass -C or set PAPERCLIP_COMPANY_ID.",
+              );
+            }
+            const query = new URLSearchParams({ companyId });
+            const agentRow = await ctx.api.get<Agent>(
+              `/api/agents/${encodeURIComponent(agentRef)}?${query.toString()}`,
+            );
+            if (!agentRow) throw new Error(`Agent not found: ${agentRef}`);
+            agentId = agentRow.id;
+          }
+
+          const resolvedPath = opts.path === "null" ? null : opts.path;
+          const payload = updateAgentInstructionsPathSchema.parse({
+            path: resolvedPath,
+            adapterConfigKey: opts.adapterConfigKey,
+          });
+
+          const updated = await ctx.api.patch<Agent>(`/api/agents/${agentId}/instructions-path`, payload);
+          printOutput(updated, { json: ctx.json });
         } catch (err) {
           handleCommandError(err);
         }
