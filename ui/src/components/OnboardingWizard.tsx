@@ -13,20 +13,21 @@ import { Dialog, DialogPortal } from "@/components/ui/dialog";
 import {
   Popover,
   PopoverContent,
-  PopoverTrigger
+  PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { cn } from "../lib/utils";
 import {
   extractModelName,
-  extractProviderIdWithFallback
+  extractProviderIdWithFallback,
 } from "../lib/model-utils";
 import { getUIAdapter } from "../adapters";
 import { defaultCreateValues } from "./agent-config-defaults";
 import { parseOnboardingGoalInput } from "../lib/onboarding-goal";
+import { DEFAULT_CLAUDE_LOCAL_MODEL } from "@paperclipai/adapter-claude-local";
 import {
   DEFAULT_CODEX_LOCAL_BYPASS_APPROVALS_AND_SANDBOX,
-  DEFAULT_CODEX_LOCAL_MODEL
+  DEFAULT_CODEX_LOCAL_MODEL,
 } from "@paperclipai/adapter-codex-local";
 import { DEFAULT_CURSOR_LOCAL_MODEL } from "@paperclipai/adapter-cursor-local";
 import { DEFAULT_GEMINI_LOCAL_MODEL } from "@paperclipai/adapter-gemini-local";
@@ -50,7 +51,7 @@ import {
   Loader2,
   FolderOpen,
   ChevronDown,
-  X
+  X,
 } from "lucide-react";
 
 type Step = 1 | 2 | 3 | 4;
@@ -96,7 +97,7 @@ export function OnboardingWizard() {
   const [agentName, setAgentName] = useState("CEO");
   const [adapterType, setAdapterType] = useState<AdapterType>("claude_local");
   const [cwd, setCwd] = useState("");
-  const [model, setModel] = useState("");
+  const [model, setModel] = useState(DEFAULT_CLAUDE_LOCAL_MODEL);
   const [command, setCommand] = useState("");
   const [args, setArgs] = useState("");
   const [url, setUrl] = useState("");
@@ -146,7 +147,7 @@ export function OnboardingWizard() {
   }, [
     onboardingOpen,
     onboardingOptions.companyId,
-    onboardingOptions.initialStep
+    onboardingOptions.initialStep,
   ]);
 
   // Backfill issue prefix for an existing company once companies are loaded.
@@ -165,13 +166,13 @@ export function OnboardingWizard() {
     data: adapterModels,
     error: adapterModelsError,
     isLoading: adapterModelsLoading,
-    isFetching: adapterModelsFetching
+    isFetching: adapterModelsFetching,
   } = useQuery({
     queryKey: createdCompanyId
       ? queryKeys.agents.adapterModels(createdCompanyId, adapterType)
       : ["agents", "none", "adapter-models", adapterType],
     queryFn: () => agentsApi.adapterModels(createdCompanyId!, adapterType),
-    enabled: Boolean(createdCompanyId) && onboardingOpen && step === 2
+    enabled: Boolean(createdCompanyId) && onboardingOpen && step === 2,
   });
   const isLocalAdapter =
     adapterType === "claude_local" ||
@@ -184,7 +185,7 @@ export function OnboardingWizard() {
     (adapterType === "codex_local"
       ? "codex"
       : adapterType === "gemini_local"
-        ? "gemini"
+      ? "gemini"
       : adapterType === "cursor"
       ? "agent"
       : adapterType === "opencode_local"
@@ -224,8 +225,8 @@ export function OnboardingWizard() {
       return [
         {
           provider: "models",
-          entries: [...filteredModels].sort((a, b) => a.id.localeCompare(b.id))
-        }
+          entries: [...filteredModels].sort((a, b) => a.id.localeCompare(b.id)),
+        },
       ];
     }
     const groups = new Map<string, Array<{ id: string; label: string }>>();
@@ -239,7 +240,7 @@ export function OnboardingWizard() {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([provider, entries]) => ({
         provider,
-        entries: [...entries].sort((a, b) => a.id.localeCompare(b.id))
+        entries: [...entries].sort((a, b) => a.id.localeCompare(b.id)),
       }));
   }, [filteredModels, adapterType]);
 
@@ -252,7 +253,7 @@ export function OnboardingWizard() {
     setAgentName("CEO");
     setAdapterType("claude_local");
     setCwd("");
-    setModel("");
+    setModel(DEFAULT_CLAUDE_LOCAL_MODEL);
     setCommand("");
     setArgs("");
     setUrl("");
@@ -281,10 +282,12 @@ export function OnboardingWizard() {
       adapterType,
       cwd,
       model:
-        adapterType === "codex_local"
+        adapterType === "claude_local"
+          ? model || DEFAULT_CLAUDE_LOCAL_MODEL
+          : adapterType === "codex_local"
           ? model || DEFAULT_CODEX_LOCAL_MODEL
           : adapterType === "gemini_local"
-            ? model || DEFAULT_GEMINI_LOCAL_MODEL
+          ? model || DEFAULT_GEMINI_LOCAL_MODEL
           : adapterType === "cursor"
           ? model || DEFAULT_CURSOR_LOCAL_MODEL
           : model,
@@ -295,7 +298,7 @@ export function OnboardingWizard() {
       dangerouslyBypassSandbox:
         adapterType === "codex_local"
           ? DEFAULT_CODEX_LOCAL_BYPASS_APPROVALS_AND_SANDBOX
-          : defaultCreateValues.dangerouslyBypassSandbox
+          : defaultCreateValues.dangerouslyBypassSandbox,
     });
     if (adapterType === "claude_local" && forceUnsetAnthropicApiKey) {
       const env =
@@ -326,7 +329,7 @@ export function OnboardingWizard() {
         createdCompanyId,
         adapterType,
         {
-          adapterConfig: adapterConfigOverride ?? buildAdapterConfig()
+          adapterConfig: adapterConfigOverride ?? buildAdapterConfig(),
         }
       );
       setAdapterEnvResult(result);
@@ -359,10 +362,10 @@ export function OnboardingWizard() {
             ? { description: parsedGoal.description }
             : {}),
           level: "company",
-          status: "active"
+          status: "active",
         });
         queryClient.invalidateQueries({
-          queryKey: queryKeys.goals.list(company.id)
+          queryKey: queryKeys.goals.list(company.id),
         });
       }
 
@@ -428,13 +431,13 @@ export function OnboardingWizard() {
             intervalSec: 3600,
             wakeOnDemand: true,
             cooldownSec: 10,
-            maxConcurrentRuns: 1
-          }
-        }
+            maxConcurrentRuns: 1,
+          },
+        },
       });
       setCreatedAgentId(agent.id);
       queryClient.invalidateQueries({
-        queryKey: queryKeys.agents.list(createdCompanyId)
+        queryKey: queryKeys.agents.list(createdCompanyId),
       });
       setStep(3);
     } catch (err) {
@@ -472,7 +475,7 @@ export function OnboardingWizard() {
           createdCompanyId
         );
         queryClient.invalidateQueries({
-          queryKey: queryKeys.agents.list(createdCompanyId)
+          queryKey: queryKeys.agents.list(createdCompanyId),
         });
       }
 
@@ -512,12 +515,12 @@ export function OnboardingWizard() {
             ? { description: taskDescription.trim() }
             : {}),
           assigneeAgentId: createdAgentId,
-          status: "todo"
+          status: "todo",
         });
         issueRef = issue.identifier ?? issue.id;
         setCreatedIssueRef(issueRef);
         queryClient.invalidateQueries({
-          queryKey: queryKeys.issues.list(createdCompanyId)
+          queryKey: queryKeys.issues.list(createdCompanyId),
         });
       }
 
@@ -585,7 +588,7 @@ export function OnboardingWizard() {
                     { step: 1 as Step, label: "Company", icon: Building2 },
                     { step: 2 as Step, label: "Agent", icon: Bot },
                     { step: 3 as Step, label: "Task", icon: ListTodo },
-                    { step: 4 as Step, label: "Launch", icon: Rocket }
+                    { step: 4 as Step, label: "Launch", icon: Rocket },
                   ] as const
                 ).map(({ step: s, label, icon: Icon }) => (
                   <button
@@ -697,15 +700,14 @@ export function OnboardingWizard() {
                           label: "Claude Code",
                           icon: Sparkles,
                           desc: "Local Claude agent",
-                          recommended: true
+                          recommended: true,
                         },
                         {
                           value: "codex_local" as const,
                           label: "Codex",
                           icon: Code,
                           desc: "Local Codex agent",
-                          recommended: true
-                        }
+                        },
                       ].map((opt) => (
                         <button
                           key={opt.value}
@@ -718,12 +720,15 @@ export function OnboardingWizard() {
                           onClick={() => {
                             const nextType = opt.value as AdapterType;
                             setAdapterType(nextType);
+                            if (nextType === "claude_local") {
+                              setModel(DEFAULT_CLAUDE_LOCAL_MODEL);
+                              return;
+                            }
                             if (nextType === "codex_local" && !model) {
                               setModel(DEFAULT_CODEX_LOCAL_MODEL);
+                              return;
                             }
-                            if (nextType !== "codex_local") {
-                              setModel("");
-                            }
+                            setModel("");
                           }}
                         >
                           {opt.recommended && (
@@ -760,25 +765,25 @@ export function OnboardingWizard() {
                             value: "gemini_local" as const,
                             label: "Gemini CLI",
                             icon: Gem,
-                            desc: "Local Gemini agent"
+                            desc: "Local Gemini agent",
                           },
                           {
                             value: "opencode_local" as const,
                             label: "OpenCode",
                             icon: OpenCodeLogoIcon,
-                            desc: "Local multi-provider agent"
+                            desc: "Local multi-provider agent",
                           },
                           {
                             value: "pi_local" as const,
                             label: "Pi",
                             icon: Terminal,
-                            desc: "Local Pi agent"
+                            desc: "Local Pi agent",
                           },
                           {
                             value: "cursor" as const,
                             label: "Cursor",
                             icon: MousePointer2,
-                            desc: "Local Cursor agent"
+                            desc: "Local Cursor agent",
                           },
                           {
                             value: "openclaw_gateway" as const,
@@ -786,8 +791,8 @@ export function OnboardingWizard() {
                             icon: Bot,
                             desc: "Invoke OpenClaw via gateway protocol",
                             comingSoon: true,
-                            disabledLabel: "Configure OpenClaw within the App"
-                          }
+                            disabledLabel: "Configure OpenClaw within the App",
+                          },
                         ].map((opt) => (
                           <button
                             key={opt.value}
@@ -1024,58 +1029,61 @@ export function OnboardingWizard() {
                         </div>
                       )}
 
-                      {adapterEnvResult && adapterEnvResult.status === "fail" && (
-                        <div className="rounded-md border border-border/70 bg-muted/20 px-2.5 py-2 text-[11px] space-y-1.5">
-                          <p className="font-medium">Manual debug</p>
-                          <p className="text-muted-foreground font-mono break-all">
-                            {adapterType === "cursor"
-                              ? `${effectiveAdapterCommand} -p --mode ask --output-format json \"Respond with hello.\"`
-                              : adapterType === "codex_local"
-                              ? `${effectiveAdapterCommand} exec --json -`
-                              : adapterType === "gemini_local"
+                      {adapterEnvResult &&
+                        adapterEnvResult.status === "fail" && (
+                          <div className="rounded-md border border-border/70 bg-muted/20 px-2.5 py-2 text-[11px] space-y-1.5">
+                            <p className="font-medium">Manual debug</p>
+                            <p className="text-muted-foreground font-mono break-all">
+                              {adapterType === "cursor"
+                                ? `${effectiveAdapterCommand} -p --mode ask --output-format json \"Respond with hello.\"`
+                                : adapterType === "codex_local"
+                                ? `${effectiveAdapterCommand} exec --json -`
+                                : adapterType === "gemini_local"
                                 ? `${effectiveAdapterCommand} --output-format json "Respond with hello."`
-                              : adapterType === "opencode_local"
+                                : adapterType === "opencode_local"
                                 ? `${effectiveAdapterCommand} run --format json "Respond with hello."`
-                              : `${effectiveAdapterCommand} --print - --output-format stream-json --verbose`}
-                          </p>
-                          <p className="text-muted-foreground">
-                            Prompt:{" "}
-                            <span className="font-mono">Respond with hello.</span>
-                          </p>
-                          {adapterType === "cursor" ||
-                          adapterType === "codex_local" ||
-                          adapterType === "gemini_local" ||
-                          adapterType === "opencode_local" ? (
+                                : `${effectiveAdapterCommand} --print - --output-format stream-json --verbose`}
+                            </p>
                             <p className="text-muted-foreground">
-                              If auth fails, set{" "}
+                              Prompt:{" "}
                               <span className="font-mono">
-                                {adapterType === "cursor"
-                                  ? "CURSOR_API_KEY"
-                                  : adapterType === "gemini_local"
+                                Respond with hello.
+                              </span>
+                            </p>
+                            {adapterType === "cursor" ||
+                            adapterType === "codex_local" ||
+                            adapterType === "gemini_local" ||
+                            adapterType === "opencode_local" ? (
+                              <p className="text-muted-foreground">
+                                If auth fails, set{" "}
+                                <span className="font-mono">
+                                  {adapterType === "cursor"
+                                    ? "CURSOR_API_KEY"
+                                    : adapterType === "gemini_local"
                                     ? "GEMINI_API_KEY"
                                     : "OPENAI_API_KEY"}
-                              </span>{" "}
-                              in env or run{" "}
-                              <span className="font-mono">
-                                {adapterType === "cursor"
-                                  ? "agent login"
-                                  : adapterType === "codex_local"
+                                </span>{" "}
+                                in env or run{" "}
+                                <span className="font-mono">
+                                  {adapterType === "cursor"
+                                    ? "agent login"
+                                    : adapterType === "codex_local"
                                     ? "codex login"
                                     : adapterType === "gemini_local"
-                                      ? "gemini auth"
-                                      : "opencode auth login"}
-                              </span>
-                              .
-                            </p>
-                          ) : (
-                            <p className="text-muted-foreground">
-                              If login is required, run{" "}
-                              <span className="font-mono">claude login</span>{" "}
-                              and retry.
-                            </p>
-                          )}
-                        </div>
-                      )}
+                                    ? "gemini auth"
+                                    : "opencode auth login"}
+                                </span>
+                                .
+                              </p>
+                            ) : (
+                              <p className="text-muted-foreground">
+                                If login is required, run{" "}
+                                <span className="font-mono">claude login</span>{" "}
+                                and retry.
+                              </p>
+                            )}
+                          </div>
+                        )}
                     </div>
                   )}
 
@@ -1319,7 +1327,7 @@ export function OnboardingWizard() {
 }
 
 function AdapterEnvironmentResult({
-  result
+  result,
 }: {
   result: AdapterEnvironmentTestResult;
 }) {

@@ -5,10 +5,7 @@ import { useDialog } from "../context/DialogContext";
 import { useCompany } from "../context/CompanyContext";
 import { agentsApi } from "../api/agents";
 import { queryKeys } from "../lib/queryKeys";
-import {
-  Dialog,
-  DialogContent,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
@@ -50,7 +47,6 @@ const ADVANCED_ADAPTER_OPTIONS: Array<{
     label: "Codex",
     icon: Code,
     desc: "Local Codex agent",
-    recommended: true,
   },
   {
     value: "gemini_local",
@@ -156,9 +152,9 @@ export function NewAgentDialog() {
                   <Sparkles className="h-6 w-6 text-foreground" />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  We recommend letting your CEO handle agent setup — they know the
-                  org structure and can configure reporting, permissions, and
-                  adapters.
+                  We recommend letting your CEO handle agent setup — they know
+                  the org structure and can configure reporting, permissions,
+                  and adapters.
                 </p>
               </div>
 

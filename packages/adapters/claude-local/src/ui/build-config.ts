@@ -1,4 +1,5 @@
 import type { CreateConfigValues } from "@paperclipai/adapter-utils";
+import { DEFAULT_CLAUDE_LOCAL_MODEL } from "../index.js";
 
 function parseCommaArgs(value: string): string[] {
   return value
@@ -23,7 +24,12 @@ function parseEnvVars(text: string): Record<string, string> {
 }
 
 function parseEnvBindings(bindings: unknown): Record<string, unknown> {
-  if (typeof bindings !== "object" || bindings === null || Array.isArray(bindings)) return {};
+  if (
+    typeof bindings !== "object" ||
+    bindings === null ||
+    Array.isArray(bindings)
+  )
+    return {};
   const env: Record<string, unknown> = {};
   for (const [key, raw] of Object.entries(bindings)) {
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
@@ -55,20 +61,23 @@ function parseJsonObject(text: string): Record<string, unknown> | null {
   if (!trimmed) return null;
   try {
     const parsed = JSON.parse(trimmed);
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
+      return null;
     return parsed as Record<string, unknown>;
   } catch {
     return null;
   }
 }
 
-export function buildClaudeLocalConfig(v: CreateConfigValues): Record<string, unknown> {
+export function buildClaudeLocalConfig(
+  v: CreateConfigValues
+): Record<string, unknown> {
   const ac: Record<string, unknown> = {};
   if (v.cwd) ac.cwd = v.cwd;
   if (v.instructionsFilePath) ac.instructionsFilePath = v.instructionsFilePath;
   if (v.promptTemplate) ac.promptTemplate = v.promptTemplate;
   if (v.bootstrapPrompt) ac.bootstrapPromptTemplate = v.bootstrapPrompt;
-  if (v.model) ac.model = v.model;
+  ac.model = v.model || DEFAULT_CLAUDE_LOCAL_MODEL;
   if (v.thinkingEffort) ac.effort = v.thinkingEffort;
   if (v.chrome) ac.chrome = true;
   ac.timeoutSec = 0;
@@ -87,8 +96,12 @@ export function buildClaudeLocalConfig(v: CreateConfigValues): Record<string, un
     ac.workspaceStrategy = {
       type: "git_worktree",
       ...(v.workspaceBaseRef ? { baseRef: v.workspaceBaseRef } : {}),
-      ...(v.workspaceBranchTemplate ? { branchTemplate: v.workspaceBranchTemplate } : {}),
-      ...(v.worktreeParentDir ? { worktreeParentDir: v.worktreeParentDir } : {}),
+      ...(v.workspaceBranchTemplate
+        ? { branchTemplate: v.workspaceBranchTemplate }
+        : {}),
+      ...(v.worktreeParentDir
+        ? { worktreeParentDir: v.worktreeParentDir }
+        : {}),
     };
   }
   const runtimeServices = parseJsonObject(v.runtimeServicesJson ?? "");

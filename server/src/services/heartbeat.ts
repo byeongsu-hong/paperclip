@@ -390,6 +390,7 @@ export function resolveRuntimeSessionParamsForWorkspace(input: {
   agentId: string;
   previousSessionParams: Record<string, unknown> | null;
   resolvedWorkspace: ResolvedWorkspaceForRun;
+  fallbackWorkspaceCwds?: string[] | null;
 }) {
   const { agentId, previousSessionParams, resolvedWorkspace } = input;
   const previousSessionId = readNonEmptyString(previousSessionParams?.sessionId);
@@ -413,8 +414,15 @@ export function resolveRuntimeSessionParamsForWorkspace(input: {
       warning: null as string | null,
     };
   }
-  const fallbackAgentHomeCwd = resolveDefaultAgentWorkspaceDir(agentId);
-  if (path.resolve(previousCwd) !== path.resolve(fallbackAgentHomeCwd)) {
+  const fallbackWorkspaceCwds = new Set(
+    [
+      resolveDefaultAgentWorkspaceDir(agentId),
+      ...((input.fallbackWorkspaceCwds ?? []).filter(
+        (value): value is string => typeof value === "string" && value.trim().length > 0,
+      )),
+    ].map((value) => path.resolve(value)),
+  );
+  if (!fallbackWorkspaceCwds.has(path.resolve(previousCwd))) {
     return {
       sessionParams: previousSessionParams,
       warning: null as string | null,
@@ -451,6 +459,33 @@ export function resolveRuntimeSessionParamsForWorkspace(input: {
     warning:
       `Project workspace "${projectCwd}" is now available. ` +
       `Attempting to resume session "${previousSessionId}" that was previously saved in fallback workspace "${previousCwd}".`,
+  };
+}
+
+export function applyPreferredFallbackWorkspace(input: {
+  agentId: string;
+  resolvedWorkspace: ResolvedWorkspaceForRun;
+  preferredFallbackCwd: string | null;
+}): ResolvedWorkspaceForRun {
+  const preferredFallbackCwd = readNonEmptyString(input.preferredFallbackCwd);
+  if (!preferredFallbackCwd) return input.resolvedWorkspace;
+
+  const defaultFallbackCwd = resolveDefaultAgentWorkspaceDir(input.agentId);
+  if (path.resolve(input.resolvedWorkspace.cwd) !== path.resolve(defaultFallbackCwd)) {
+    return input.resolvedWorkspace;
+  }
+
+  const normalizedPreferredFallbackCwd = path.resolve(preferredFallbackCwd);
+  if (normalizedPreferredFallbackCwd === path.resolve(defaultFallbackCwd)) {
+    return input.resolvedWorkspace;
+  }
+
+  return {
+    ...input.resolvedWorkspace,
+    cwd: normalizedPreferredFallbackCwd,
+    warnings: input.resolvedWorkspace.warnings.map((warning) =>
+      warning.replaceAll(defaultFallbackCwd, normalizedPreferredFallbackCwd),
+    ),
   };
 }
 
@@ -1709,6 +1744,12 @@ export function heartbeatService(db: Db) {
       agent.companyId,
       mergedConfig,
     );
+    const preferredFallbackCwd = readNonEmptyString(resolvedConfig.cwd);
+    const effectiveResolvedWorkspace = applyPreferredFallbackWorkspace({
+      agentId: agent.id,
+      resolvedWorkspace,
+      preferredFallbackCwd,
+    });
     const issueRef = issueContext
       ? {
           id: issueContext.id,
@@ -1729,12 +1770,12 @@ export function heartbeatService(db: Db) {
     });
     const executionWorkspace = await realizeExecutionWorkspace({
       base: {
-        baseCwd: resolvedWorkspace.cwd,
-        source: resolvedWorkspace.source,
-        projectId: resolvedWorkspace.projectId,
-        workspaceId: resolvedWorkspace.workspaceId,
-        repoUrl: resolvedWorkspace.repoUrl,
-        repoRef: resolvedWorkspace.repoRef,
+        baseCwd: effectiveResolvedWorkspace.cwd,
+        source: effectiveResolvedWorkspace.source,
+        projectId: effectiveResolvedWorkspace.projectId,
+        workspaceId: effectiveResolvedWorkspace.workspaceId,
+        repoUrl: effectiveResolvedWorkspace.repoUrl,
+        repoRef: effectiveResolvedWorkspace.repoRef,
       },
       config: resolvedConfig,
       issue: issueRef,
@@ -1873,13 +1914,14 @@ export function heartbeatService(db: Db) {
       agentId: agent.id,
       previousSessionParams,
       resolvedWorkspace: {
-        ...resolvedWorkspace,
+        ...effectiveResolvedWorkspace,
         cwd: executionWorkspace.cwd,
       },
+      fallbackWorkspaceCwds: preferredFallbackCwd ? [preferredFallbackCwd] : [],
     });
     const runtimeSessionParams = runtimeSessionResolution.sessionParams;
     const runtimeWorkspaceWarnings = [
-      ...resolvedWorkspace.warnings,
+      ...effectiveResolvedWorkspace.warnings,
       ...executionWorkspace.warnings,
       ...(runtimeSessionResolution.warning ? [runtimeSessionResolution.warning] : []),
       ...(resetTaskSession && sessionResetReason
@@ -1903,7 +1945,7 @@ export function heartbeatService(db: Db) {
       worktreePath: executionWorkspace.worktreePath,
       agentHome: resolveDefaultAgentWorkspaceDir(agent.id),
     };
-    context.paperclipWorkspaces = resolvedWorkspace.workspaceHints;
+    context.paperclipWorkspaces = effectiveResolvedWorkspace.workspaceHints;
     const runtimeServiceIntents = (() => {
       const runtimeConfig = parseObject(resolvedConfig.workspaceRuntime);
       return Array.isArray(runtimeConfig.services)

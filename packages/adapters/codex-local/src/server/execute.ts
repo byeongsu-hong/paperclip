@@ -117,7 +117,7 @@ export async function ensureCodexSkillsInjected(
   for (const skillName of removedSkills) {
     await onLog(
       "stdout",
-      `[paperclip] Removed maintainer-only Codex skill "${skillName}" from ${skillsHome}\n`,
+      `[paperclip] Removed retired Codex skill "${skillName}" from ${skillsHome}\n`,
     );
   }
   const linkSkill = options.linkSkill;

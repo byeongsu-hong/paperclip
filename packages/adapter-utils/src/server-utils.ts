@@ -51,6 +51,35 @@ function isMaintainerOnlySkillTarget(candidate: string): boolean {
   return normalizePathSlashes(candidate).includes("/.agents/skills/");
 }
 
+async function isLikelyPaperclipRepoRoot(candidate: string): Promise<boolean> {
+  const [hasWorkspace, hasPackageJson, hasServerDir, hasAdapterUtilsDir] = await Promise.all([
+    pathExists(path.join(candidate, "pnpm-workspace.yaml")),
+    pathExists(path.join(candidate, "package.json")),
+    pathExists(path.join(candidate, "server")),
+    pathExists(path.join(candidate, "packages", "adapter-utils")),
+  ]);
+
+  return hasWorkspace && hasPackageJson && hasServerDir && hasAdapterUtilsDir;
+}
+
+async function isRetiredPaperclipRuntimeSkillTarget(candidate: string): Promise<boolean> {
+  const normalizedCandidate = path.isAbsolute(candidate)
+    ? path.normalize(candidate)
+    : path.resolve(candidate);
+  const skillsRoot = path.dirname(normalizedCandidate);
+  if (path.basename(skillsRoot) !== "skills") return false;
+
+  let cursor = path.dirname(skillsRoot);
+  for (let depth = 0; depth < 6; depth += 1) {
+    if (await isLikelyPaperclipRepoRoot(cursor)) return true;
+    const parent = path.dirname(cursor);
+    if (parent === cursor) break;
+    cursor = parent;
+  }
+
+  return false;
+}
+
 export function parseObject(value: unknown): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return {};
@@ -397,7 +426,8 @@ export async function removeMaintainerOnlySkillSymlinks(
         : path.resolve(path.dirname(target), linkedPath);
       if (
         !isMaintainerOnlySkillTarget(linkedPath) &&
-        !isMaintainerOnlySkillTarget(resolvedLinkedPath)
+        !isMaintainerOnlySkillTarget(resolvedLinkedPath) &&
+        !(await isRetiredPaperclipRuntimeSkillTarget(resolvedLinkedPath))
       ) {
         continue;
       }

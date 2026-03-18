@@ -58,4 +58,29 @@ describe("paperclip skill utils", () => {
     expect((await fs.lstat(path.join(skillsHome, "paperclip"))).isSymbolicLink()).toBe(true);
     expect((await fs.lstat(path.join(skillsHome, "release-notes"))).isSymbolicLink()).toBe(true);
   });
+
+  it("removes a retired Paperclip runtime skill symlink from a shared skills home", async () => {
+    const root = await makeTempDir("paperclip-skill-retired-");
+    cleanupDirs.add(root);
+
+    const skillsHome = path.join(root, "skills-home");
+    const runtimeSkill = path.join(root, "skills", "paperclip");
+    const retiredRuntimeSkill = path.join(root, "skills", "create-agent-adapter");
+
+    await fs.mkdir(skillsHome, { recursive: true });
+    await fs.mkdir(runtimeSkill, { recursive: true });
+    await fs.mkdir(path.join(root, "server"), { recursive: true });
+    await fs.mkdir(path.join(root, "packages", "adapter-utils"), { recursive: true });
+    await fs.writeFile(path.join(root, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n", "utf8");
+    await fs.writeFile(path.join(root, "package.json"), '{"name":"paperclip"}\n', "utf8");
+
+    await fs.symlink(runtimeSkill, path.join(skillsHome, "paperclip"));
+    await fs.symlink(retiredRuntimeSkill, path.join(skillsHome, "create-agent-adapter"));
+
+    const removed = await removeMaintainerOnlySkillSymlinks(skillsHome, ["paperclip"]);
+
+    expect(removed).toEqual(["create-agent-adapter"]);
+    await expect(fs.lstat(path.join(skillsHome, "create-agent-adapter"))).rejects.toThrow();
+    expect((await fs.lstat(path.join(skillsHome, "paperclip"))).isSymbolicLink()).toBe(true);
+  });
 });

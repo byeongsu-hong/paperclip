@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { agents } from "@paperclipai/db";
 import { resolveDefaultAgentWorkspaceDir } from "../home-paths.js";
 import {
+  applyPreferredFallbackWorkspace,
   prioritizeProjectWorkspaceCandidatesForRun,
   parseSessionCompactionPolicy,
   resolveRuntimeSessionParamsForWorkspace,
@@ -91,6 +92,26 @@ describe("resolveRuntimeSessionParamsForWorkspace", () => {
     expect(result.warning).toBeNull();
   });
 
+  it("migrates when previous session cwd matches a configured fallback workspace", () => {
+    const result = resolveRuntimeSessionParamsForWorkspace({
+      agentId: "agent-123",
+      previousSessionParams: {
+        sessionId: "session-1",
+        cwd: "/home/ubuntu/workspace",
+        workspaceId: "workspace-1",
+      },
+      resolvedWorkspace: buildResolvedWorkspace({ cwd: "/tmp/new-project-cwd" }),
+      fallbackWorkspaceCwds: ["/home/ubuntu/workspace"],
+    });
+
+    expect(result.sessionParams).toMatchObject({
+      sessionId: "session-1",
+      cwd: "/tmp/new-project-cwd",
+      workspaceId: "workspace-1",
+    });
+    expect(result.warning).toContain('fallback workspace "/home/ubuntu/workspace"');
+  });
+
   it("does not migrate when resolved workspace id differs from previous session workspace id", () => {
     const agentId = "agent-123";
     const fallbackCwd = resolveDefaultAgentWorkspaceDir(agentId);
@@ -114,6 +135,30 @@ describe("resolveRuntimeSessionParamsForWorkspace", () => {
       workspaceId: "workspace-1",
     });
     expect(result.warning).toBeNull();
+  });
+});
+
+describe("applyPreferredFallbackWorkspace", () => {
+  it("replaces the default agent-home fallback with the configured cwd", () => {
+    const agentId = "agent-123";
+    const fallbackCwd = resolveDefaultAgentWorkspaceDir(agentId);
+
+    const result = applyPreferredFallbackWorkspace({
+      agentId,
+      preferredFallbackCwd: "/home/ubuntu/workspace",
+      resolvedWorkspace: buildResolvedWorkspace({
+        cwd: fallbackCwd,
+        source: "agent_home",
+        warnings: [
+          `No project or prior session workspace was available. Using fallback workspace "${fallbackCwd}" for this run.`,
+        ],
+      }),
+    });
+
+    expect(result.cwd).toBe("/home/ubuntu/workspace");
+    expect(result.warnings).toEqual([
+      'No project or prior session workspace was available. Using fallback workspace "/home/ubuntu/workspace" for this run.',
+    ]);
   });
 });
 

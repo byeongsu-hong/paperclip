@@ -30,9 +30,9 @@ test.describe("Onboarding wizard", () => {
     const newCompanyBtn = page.getByRole("button", { name: "New Company" });
 
     // Wait for either the wizard or the start page
-    await expect(
-      wizardHeading.or(newCompanyBtn)
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(wizardHeading.or(newCompanyBtn)).toBeVisible({
+      timeout: 15_000,
+    });
 
     if (await newCompanyBtn.isVisible()) {
       await newCompanyBtn.click();
@@ -152,18 +152,14 @@ test.describe("Onboarding wizard", () => {
     );
     expect(issuesRes.ok()).toBe(true);
     const issues = await issuesRes.json();
-    const task = issues.find(
-      (i: { title: string }) => i.title === TASK_TITLE
-    );
+    const task = issues.find((i: { title: string }) => i.title === TASK_TITLE);
     expect(task).toBeTruthy();
     expect(task.assigneeAgentId).toBe(ceoAgent.id);
 
     if (!SKIP_LLM) {
       // LLM-dependent: wait for the heartbeat to transition the issue
       await expect(async () => {
-        const res = await page.request.get(
-          `${baseUrl}/api/issues/${task.id}`
-        );
+        const res = await page.request.get(`${baseUrl}/api/issues/${task.id}`);
         const issue = await res.json();
         expect(["in_progress", "done"]).toContain(issue.status);
       }).toPass({ timeout: 120_000, intervals: [5_000] });
