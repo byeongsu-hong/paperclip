@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import type { Duplex } from "node:stream";
 import os from "node:os";
 import { CLI_AUTH_COMMANDS } from "../services/cli-auth.js";
+import { logger } from "../middleware/logger.js";
 
 interface WsSocket {
   readyState: number;
@@ -30,10 +31,28 @@ const { WebSocketServer } = require("ws") as {
   WebSocketServer: new (opts: { noServer: boolean }) => WsServer;
 };
 
-export function handleCliAuthWebSocket(ws: WsSocket, cliName: string) {
+function sendError(ws: WsSocket, message: string) {
+  try {
+    ws.send(JSON.stringify({ type: "error", message }));
+  } catch {
+    // ignore
+  }
+}
+
+export function handleCliAuthWebSocket(
+  ws: WsSocket,
+  cliName: string,
+  opts: { authenticated: boolean },
+) {
+  if (!opts.authenticated) {
+    sendError(ws, "Session not found. Please reload the page and log in again.");
+    ws.close(4401, "Unauthenticated");
+    return;
+  }
+
   const authCmd = CLI_AUTH_COMMANDS[cliName];
   if (!authCmd) {
-    ws.send(JSON.stringify({ type: "error", message: `Unknown CLI: ${cliName}` }));
+    sendError(ws, `Unknown CLI: ${cliName}`);
     ws.close();
     return;
   }
@@ -42,8 +61,9 @@ export function handleCliAuthWebSocket(ws: WsSocket, cliName: string) {
   let pty: typeof import("node-pty");
   try {
     pty = require("node-pty") as typeof import("node-pty");
-  } catch {
-    ws.send(JSON.stringify({ type: "error", message: "node-pty is not available on this server" }));
+  } catch (err) {
+    logger.error({ err }, "node-pty is not available");
+    sendError(ws, "node-pty is not available on this server");
     ws.close();
     return;
   }
@@ -51,13 +71,21 @@ export function handleCliAuthWebSocket(ws: WsSocket, cliName: string) {
   const [bin, ...args] = authCmd;
   const cwd = os.homedir();
 
-  const ptyProcess = pty.spawn(bin, args, {
-    name: "xterm-color",
-    cols: 120,
-    rows: 30,
-    cwd,
-    env: process.env as Record<string, string>,
-  });
+  let ptyProcess: ReturnType<typeof pty.spawn>;
+  try {
+    ptyProcess = pty.spawn(bin, args, {
+      name: "xterm-color",
+      cols: 120,
+      rows: 30,
+      cwd,
+      env: process.env as Record<string, string>,
+    });
+  } catch (err) {
+    logger.error({ err, bin }, "Failed to spawn CLI auth process");
+    sendError(ws, `Failed to start ${bin}: ${err instanceof Error ? err.message : String(err)}`);
+    ws.close();
+    return;
+  }
 
   // PTY → WebSocket
   ptyProcess.onData((data) => {
@@ -109,12 +137,11 @@ export function setupCliAuthWebSocketServer(
 ) {
   const wss = new WebSocketServer({ noServer: true });
 
-  wss.on("connection", (ws: WsSocket, req: IncomingMessage) => {
-    // Extract CLI name from URL: /api/models/auth/<cliName>
+  wss.on("connection", (ws: WsSocket, req: IncomingMessage & { _authenticated?: boolean }) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     const parts = url.pathname.split("/");
     const cliName = parts[parts.length - 1];
-    handleCliAuthWebSocket(ws, cliName);
+    handleCliAuthWebSocket(ws, cliName, { authenticated: req._authenticated ?? false });
   });
 
   server.on("upgrade", (req: IncomingMessage, socket: Duplex, head: Buffer) => {
@@ -122,15 +149,27 @@ export function setupCliAuthWebSocketServer(
     const url = new URL(req.url, "http://localhost");
     if (!url.pathname.startsWith("/api/models/auth/")) return;
 
+    const proceed = (authenticated: boolean) => {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        (req as any)._authenticated = authenticated;
+        wss.emit("connection", ws, req);
+      });
+    };
+
     if (opts.resolveSessionFromHeaders) {
       void (opts.resolveSessionFromHeaders as Function)(new Headers(req.headers as any))
         .then((session: any) => {
-          if (!session) { socket.destroy(); return; }
-          wss.handleUpgrade(req, socket, head, (ws: any) => wss.emit("connection", ws, req));
+          if (!session) {
+            logger.warn("cli-auth WS: session not found, proceeding unauthenticated to surface error in terminal");
+          }
+          proceed(!!session);
         })
-        .catch(() => socket.destroy());
+        .catch((err: unknown) => {
+          logger.error({ err }, "cli-auth WS: session resolution threw, proceeding unauthenticated");
+          proceed(false);
+        });
     } else {
-      wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req));
+      proceed(true);
     }
   });
 
