@@ -9,6 +9,9 @@ import {
   SquarePen,
   Network,
   Settings,
+  FolderOpen,
+  SquareTerminal,
+  MessageSquare,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { SidebarSection } from "./SidebarSection";
@@ -103,6 +106,12 @@ export function Sidebar() {
         <SidebarProjects />
 
         <SidebarAgents />
+
+        <SidebarSection label="Workspace">
+          <SidebarNavItem to="/filesystem" label="Filesystem" icon={FolderOpen} />
+          <SidebarNavItem to="/terminal" label="Terminal" icon={SquareTerminal} />
+          <SidebarNavItem to="/chat" label="Chat" icon={MessageSquare} />
+        </SidebarSection>
 
         <SidebarSection label="Company">
           <SidebarNavItem to="/org" label="Org" icon={Network} />
