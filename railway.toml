@@ -1,0 +1,21 @@
+# Railway deployment configuration for Paperclip
+# https://docs.railway.com/reference/config-as-code
+#
+# Resource requirements — set in Railway Dashboard > Service > Settings:
+#   CPU:    2 vCPU
+#   Memory: 4 GB
+#   Volume: 64 GB  (attach volume at /paperclip via Dashboard > Volumes)
+# Note: Railway does not support CPU/memory limits or volume size in railway.toml.
+
+[build]
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "node --import ./server/node_modules/tsx/dist/loader.mjs server/dist/index.js"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
+
+[[volumes]]
+mountPath = "/paperclip"

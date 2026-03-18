@@ -15,6 +15,10 @@
   <a href="https://discord.gg/m4HZY7xNG3"><img src="https://img.shields.io/discord/000000000?label=discord" alt="Discord" /></a>
 </p>
 
+<p align="center">
+  <a href="https://railway.com/new/template?template=https://github.com/paperclipai/paperclip"><img src="https://railway.com/button.svg" alt="Deploy on Railway" /></a>
+</p>
+
 <br/>
 
 <div align="center">
