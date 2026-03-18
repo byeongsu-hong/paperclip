@@ -9,6 +9,8 @@ import { goalsApi } from "../api/goals";
 import { agentsApi } from "../api/agents";
 import { issuesApi } from "../api/issues";
 import { queryKeys } from "../lib/queryKeys";
+import { modelsApi, type CliAuthStatus } from "@/api/models";
+import { CliAuthTerminal } from "./CliAuthTerminal";
 import { Dialog, DialogPortal } from "@/components/ui/dialog";
 import {
   Popover,
@@ -48,6 +50,7 @@ import {
   Sparkles,
   MousePointer2,
   Check,
+  CheckCircle2,
   Loader2,
   FolderOpen,
   ChevronDown,
@@ -109,6 +112,9 @@ export function OnboardingWizard() {
     useState(false);
   const [unsetAnthropicLoading, setUnsetAnthropicLoading] = useState(false);
   const [showMoreAdapters, setShowMoreAdapters] = useState(false);
+  const [cliAuthStatus, setCliAuthStatus] = useState<CliAuthStatus | null>(null);
+  const [cliAuthLoading, setCliAuthLoading] = useState(false);
+  const [showCliAuth, setShowCliAuth] = useState(false);
 
   // Step 3
   const [taskTitle, setTaskTitle] = useState("Create your CEO HEARTBEAT.md");
@@ -244,6 +250,30 @@ export function OnboardingWizard() {
       }));
   }, [filteredModels, adapterType]);
 
+  const CLI_AUTH_REQUIRED: Partial<Record<string, string>> = {
+    claude_local: "claude",
+    gemini_local: "gemini",
+    codex_local: "codex",
+  };
+
+  async function checkAdapterAuthStatus(adapter: string) {
+    const cliName = CLI_AUTH_REQUIRED[adapter];
+    if (!cliName) {
+      setCliAuthStatus("authenticated");
+      setShowCliAuth(false);
+      return;
+    }
+    setCliAuthLoading(true);
+    try {
+      const { statuses } = await modelsApi.getStatus();
+      const status = statuses[cliName] ?? "not-installed";
+      setCliAuthStatus(status);
+      setShowCliAuth(status === "unauthenticated");
+    } finally {
+      setCliAuthLoading(false);
+    }
+  }
+
   function reset() {
     setStep(1);
     setLoading(false);
@@ -268,6 +298,9 @@ export function OnboardingWizard() {
     setCreatedCompanyPrefix(null);
     setCreatedAgentId(null);
     setCreatedIssueRef(null);
+    setCliAuthStatus(null);
+    setCliAuthLoading(false);
+    setShowCliAuth(false);
   }
 
   function handleClose() {
@@ -720,6 +753,9 @@ export function OnboardingWizard() {
                           onClick={() => {
                             const nextType = opt.value as AdapterType;
                             setAdapterType(nextType);
+                            setCliAuthStatus(null);
+                            setShowCliAuth(false);
+                            void checkAdapterAuthStatus(nextType);
                             if (nextType === "claude_local") {
                               setModel(DEFAULT_CLAUDE_LOCAL_MODEL);
                               return;
@@ -809,6 +845,9 @@ export function OnboardingWizard() {
                               if (opt.comingSoon) return;
                               const nextType = opt.value as AdapterType;
                               setAdapterType(nextType);
+                              setCliAuthStatus(null);
+                              setShowCliAuth(false);
+                              void checkAdapterAuthStatus(nextType);
                               if (nextType === "gemini_local" && !model) {
                                 setModel(DEFAULT_GEMINI_LOCAL_MODEL);
                                 return;
@@ -963,6 +1002,32 @@ export function OnboardingWizard() {
                           </PopoverContent>
                         </Popover>
                       </div>
+                    </div>
+                  )}
+
+                  {/* CLI auth block — shown when unauthenticated adapter selected */}
+                  {showCliAuth && CLI_AUTH_REQUIRED[adapterType] && (
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 flex flex-col gap-3">
+                      <span className="text-sm font-medium text-amber-600">
+                        {adapterType === "claude_local" && "Claude Code"}
+                        {adapterType === "gemini_local" && "Gemini CLI"}
+                        {adapterType === "codex_local" && "Codex CLI"}
+                        {" "}인증이 필요합니다
+                      </span>
+                      <CliAuthTerminal
+                        cliName={CLI_AUTH_REQUIRED[adapterType]!}
+                        onComplete={() => {
+                          setShowCliAuth(false);
+                          setCliAuthStatus("authenticated");
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {cliAuthStatus === "authenticated" && CLI_AUTH_REQUIRED[adapterType] && !showCliAuth && (
+                    <div className="flex items-center gap-2 text-sm text-green-600">
+                      <CheckCircle2 className="h-4 w-4" />
+                      CLI 인증 완료
                     </div>
                   )}
 
@@ -1270,7 +1335,11 @@ export function OnboardingWizard() {
                     <Button
                       size="sm"
                       disabled={
-                        !agentName.trim() || loading || adapterEnvLoading
+                        !agentName.trim() ||
+                        loading ||
+                        adapterEnvLoading ||
+                        cliAuthLoading ||
+                        (CLI_AUTH_REQUIRED[adapterType] !== undefined && cliAuthStatus !== "authenticated")
                       }
                       onClick={handleStep2Next}
                     >
