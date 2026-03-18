@@ -38,7 +38,7 @@ RUN pnpm --filter @paperclipai/agent-cli build
 FROM base AS production
 WORKDIR /app
 COPY --chown=node:node --from=build /app /app
-RUN npm install --global --omit=dev @anthropic-ai/claude-code@latest @openai/codex@latest opencode-ai @google/generative-ai@latest \
+RUN npm install --global --omit=dev @anthropic-ai/claude-code@latest @openai/codex@latest opencode-ai @google/gemini-cli \
   && ln -s /app/packages/agent-cli/dist/index.js /usr/local/bin/pc \
   && chmod +x /app/packages/agent-cli/dist/index.js \
   && mkdir -p /paperclip \

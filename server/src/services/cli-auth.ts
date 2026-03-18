@@ -10,7 +10,7 @@ type CliConfig = {
 const CLI_CONFIGS: Record<string, CliConfig> = {
   claude: { bin: "claude", args: ["auth", "status"] },
   gemini: { bin: "gemini", args: ["auth", "print-access-token"] },
-  codex: { bin: "codex", args: ["--version"] },
+  codex: { bin: "codex", args: ["login", "status"] },
 };
 
 export function checkCliAuthStatus(cli: string): CliAuthStatus {
