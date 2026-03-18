@@ -2698,9 +2698,7 @@ export function accessRoutes(
     }
   );
 
-  // POST /auth/bootstrap-web
-  // No auth required. Only works when no admin exists (bootstrap_pending state).
-  // Revokes any existing active bootstrap invite and creates a new one.
+  // POST /auth/bootstrap-web — see bootstrapWebRoute() below (mounted before betterAuthHandler)
   router.post("/auth/bootstrap-web", async (req, res) => {
     // Reject if an admin already exists
     const adminCount = await db
@@ -2743,6 +2741,63 @@ export function accessRoutes(
     });
 
     // Determine public URL
+    const baseUrl =
+      process.env.PAPERCLIP_PUBLIC_URL?.replace(/\/+$/, "") ??
+      process.env.BETTER_AUTH_URL?.replace(/\/+$/, "") ??
+      requestBaseUrl(req);
+
+    const inviteUrl = `${baseUrl}/invite/${token}`;
+    res.json({ inviteUrl });
+  });
+
+  return router;
+}
+
+/**
+ * Mount this on app (not the api Router) BEFORE betterAuthHandler so that
+ * POST /api/auth/bootstrap-web is not swallowed by the Better Auth wildcard.
+ */
+export function bootstrapWebRoute(db: Db) {
+  const router = Router();
+
+  router.post("/", async (req, res) => {
+    const adminCount = await db
+      .select()
+      .from(instanceUserRoles)
+      .where(eq(instanceUserRoles.role, "instance_admin"))
+      .then((rows) => rows.length);
+
+    if (adminCount > 0) {
+      res.status(409).json({ error: "Instance already has an admin. Bootstrap not allowed." });
+      return;
+    }
+
+    const now = new Date();
+
+    await db
+      .update(invites)
+      .set({ revokedAt: now, updatedAt: now })
+      .where(
+        and(
+          eq(invites.inviteType, "bootstrap_ceo"),
+          isNull(invites.revokedAt),
+          isNull(invites.acceptedAt),
+          gt(invites.expiresAt, now),
+        ),
+      );
+
+    const token = `pcp_bootstrap_${randomBytes(24).toString("hex")}`;
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
+
+    await db.insert(invites).values({
+      inviteType: "bootstrap_ceo",
+      tokenHash,
+      allowedJoinTypes: "human",
+      expiresAt,
+      invitedByUserId: "system",
+    });
+
     const baseUrl =
       process.env.PAPERCLIP_PUBLIC_URL?.replace(/\/+$/, "") ??
       process.env.BETTER_AUTH_URL?.replace(/\/+$/, "") ??

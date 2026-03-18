@@ -28,7 +28,7 @@ import { filesystemRoutes } from "./routes/filesystem.js";
 import { chatRoutes } from "./routes/chat.js";
 import { llmRoutes } from "./routes/llms.js";
 import { assetRoutes } from "./routes/assets.js";
-import { accessRoutes } from "./routes/access.js";
+import { accessRoutes, bootstrapWebRoute } from "./routes/access.js";
 import { pluginRoutes } from "./routes/plugins.js";
 import { pluginUiStaticRoutes } from "./routes/plugin-ui-static.js";
 import { applyUiBranding } from "./ui-branding.js";
@@ -133,6 +133,8 @@ export async function createApp(
       },
     });
   });
+  // Mount bootstrap-web before betterAuthHandler so /api/auth/* wildcard doesn't swallow it
+  app.use("/api/auth/bootstrap-web", bootstrapWebRoute(db));
   if (opts.betterAuthHandler) {
     app.all("/api/auth/*authPath", opts.betterAuthHandler);
   }
