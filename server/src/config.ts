@@ -141,12 +141,16 @@ export function loadConfig(): Config {
       ? (authBaseUrlModeFromEnvRaw as AuthBaseUrlMode)
       : null;
   const publicUrlFromEnv = process.env.PAPERCLIP_PUBLIC_URL;
+  const railwayPublicUrl = process.env.RAILWAY_PUBLIC_DOMAIN
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN.trim()}`
+    : undefined;
   const authPublicBaseUrlRaw =
     process.env.PAPERCLIP_AUTH_PUBLIC_BASE_URL ??
     process.env.BETTER_AUTH_URL ??
     process.env.BETTER_AUTH_BASE_URL ??
     publicUrlFromEnv ??
-    fileConfig?.auth?.publicBaseUrl;
+    fileConfig?.auth?.publicBaseUrl ??
+    railwayPublicUrl;
   const authPublicBaseUrl = authPublicBaseUrlRaw?.trim() || undefined;
   const authBaseUrlMode: AuthBaseUrlMode =
     authBaseUrlModeFromEnv ??
@@ -173,13 +177,11 @@ export function loadConfig(): Config {
       }
     })()
     : null;
-  const railwayPublicDomain = process.env.RAILWAY_PUBLIC_DOMAIN?.trim().toLowerCase() || null;
   const allowedHostnames = Array.from(
     new Set(
       [
         ...(allowedHostnamesFromEnv ?? fileConfig?.server.allowedHostnames ?? []),
         ...(publicUrlHostname ? [publicUrlHostname] : []),
-        ...(railwayPublicDomain ? [railwayPublicDomain] : []),
       ]
         .map((value) => value.trim().toLowerCase())
         .filter(Boolean),
