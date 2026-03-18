@@ -26,6 +26,8 @@ import { createApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { logger } from "./middleware/logger.js";
 import { setupLiveEventsWebSocketServer } from "./realtime/live-events-ws.js";
+import { setupCliAuthWebSocketServer } from "./realtime/cli-auth-ws.js";
+import { setupTerminalWebSocketServer } from "./realtime/terminal-sessions.js";
 import { heartbeatService, reconcilePersistedRuntimeServicesOnStartup } from "./services/index.js";
 import { createStorageServiceFromConfig } from "./storage/index.js";
 import { printStartupBanner } from "./startup-banner.js";
@@ -507,6 +509,16 @@ export async function startServer(): Promise<StartedServer> {
   process.env.PAPERCLIP_API_URL = `http://${runtimeApiHost}:${listenPort}`;
   
   setupLiveEventsWebSocketServer(server, db as any, {
+    deploymentMode: config.deploymentMode,
+    resolveSessionFromHeaders,
+  });
+
+  setupCliAuthWebSocketServer(server, {
+    deploymentMode: config.deploymentMode,
+    resolveSessionFromHeaders,
+  });
+
+  setupTerminalWebSocketServer(server, {
     deploymentMode: config.deploymentMode,
     resolveSessionFromHeaders,
   });
