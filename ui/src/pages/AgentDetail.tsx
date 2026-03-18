@@ -63,6 +63,7 @@ import { AgentIcon, AgentIconPicker } from "../components/AgentIconPicker";
 import { RunTranscriptView, type TranscriptMode } from "../components/transcript/RunTranscriptView";
 import {
   isUuidLike,
+  PERMISSION_KEYS,
   type Agent,
   type BudgetPolicySummary,
   type HeartbeatRun,
@@ -70,6 +71,7 @@ import {
   type AgentRuntimeState,
   type LiveEvent,
   type WorkspaceOperation,
+  type PermissionKey,
 } from "@paperclipai/shared";
 import { redactHomePathUserSegments, redactHomePathUserSegmentsInValue } from "@paperclipai/adapter-utils";
 import { agentRouteRef } from "../lib/utils";
@@ -1404,24 +1406,93 @@ function ConfigurationTab({
         sectionLayout="cards"
       />
 
-      <div>
-        <h3 className="text-sm font-medium mb-3">Permissions</h3>
-        <div className="border border-border rounded-lg p-4">
-          <div className="flex items-center justify-between text-sm">
-            <span>Can create new agents</span>
+      <PermissionsSection agent={agent} companyId={companyId} updatePermissions={updatePermissions} />
+    </div>
+  );
+}
+
+const PERMISSION_LABELS: Record<string, string> = {
+  "agents:create": "에이전트 생성",
+  "users:invite": "사용자 초대",
+  "users:manage_permissions": "권한 관리",
+  "tasks:assign": "작업 할당",
+  "tasks:assign_scope": "작업 범위 할당",
+  "joins:approve": "참가 요청 승인",
+};
+
+function PermissionsSection({
+  agent,
+  companyId,
+  updatePermissions,
+}: {
+  agent: Agent;
+  companyId?: string;
+  updatePermissions: { mutate: (canCreate: boolean) => void; isPending: boolean };
+}) {
+  const queryClient = useQueryClient();
+
+  const { data: grantsData, isFetching: grantsFetching } = useQuery({
+    queryKey: ["agents", "grants", agent.id],
+    queryFn: () => agentsApi.getGrants(agent.id, companyId),
+  });
+
+  const currentKeys = grantsData?.keys ?? [];
+
+  const updateGrants = useMutation({
+    mutationFn: (keys: PermissionKey[]) => agentsApi.updateGrants(agent.id, keys, companyId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agents", "grants", agent.id] });
+    },
+    onError: (err) => {
+      console.error("Failed to update grants", err);
+    },
+  });
+
+  function toggleGrant(key: PermissionKey) {
+    const next = currentKeys.includes(key)
+      ? currentKeys.filter(k => k !== key)
+      : [...currentKeys, key];
+    updateGrants.mutate(next);
+  }
+
+  return (
+    <div>
+      <h3 className="text-sm font-medium mb-3">Permissions</h3>
+      <div className="border border-border rounded-lg p-4 mb-3">
+        <div className="flex items-center justify-between text-sm">
+          <span>Can create new agents</span>
+          <Button
+            variant={agent.permissions?.canCreateAgents ? "default" : "outline"}
+            size="sm"
+            className="h-7 px-2.5 text-xs"
+            onClick={() =>
+              updatePermissions.mutate(!Boolean(agent.permissions?.canCreateAgents))
+            }
+            disabled={updatePermissions.isPending}
+          >
+            {agent.permissions?.canCreateAgents ? "Enabled" : "Disabled"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="border border-border rounded-lg divide-y divide-border">
+        {PERMISSION_KEYS.map(key => (
+          <div key={key} className="flex items-center justify-between p-3 text-sm">
+            <div>
+              <span>{PERMISSION_LABELS[key]}</span>
+              <span className="ml-2 text-xs text-muted-foreground font-mono">{key}</span>
+            </div>
             <Button
-              variant={agent.permissions?.canCreateAgents ? "default" : "outline"}
+              variant={currentKeys.includes(key) ? "default" : "outline"}
               size="sm"
               className="h-7 px-2.5 text-xs"
-              onClick={() =>
-                updatePermissions.mutate(!Boolean(agent.permissions?.canCreateAgents))
-              }
-              disabled={updatePermissions.isPending}
+              onClick={() => toggleGrant(key)}
+              disabled={updateGrants.isPending || grantsFetching}
             >
-              {agent.permissions?.canCreateAgents ? "Enabled" : "Disabled"}
+              {currentKeys.includes(key) ? "Enabled" : "Disabled"}
             </Button>
           </div>
-        </div>
+        ))}
       </div>
     </div>
   );

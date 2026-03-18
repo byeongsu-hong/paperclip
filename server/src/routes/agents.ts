@@ -14,6 +14,7 @@ import {
   createAgentSchema,
   deriveAgentUrlKey,
   isUuidLike,
+  PERMISSION_KEYS,
   resetAgentSessionSchema,
   testAdapterEnvironmentSchema,
   type InstanceSchedulerHeartbeatAgent,
@@ -1153,6 +1154,95 @@ export function agentRoutes(db: Db) {
       res.json(agent);
     }
   );
+
+  router.get("/agents/:id/grants", async (req, res) => {
+    const id = req.params.id as string;
+    const existing = await svc.getById(id);
+    if (!existing) {
+      res.status(404).json({ error: "Agent not found" });
+      return;
+    }
+    assertCompanyAccess(req, existing.companyId);
+
+    if (req.actor.type === "board") {
+      if (req.actor.source !== "local_implicit" && !req.actor.isInstanceAdmin) {
+        const allowed = await access.canUser(existing.companyId, req.actor.userId, "users:manage_permissions");
+        if (!allowed) {
+          res.status(403).json({ error: "Missing permission: users:manage_permissions" });
+          return;
+        }
+      }
+    }
+    if (req.actor.type === "agent") {
+      const actorAgent = req.actor.agentId ? await svc.getById(req.actor.agentId) : null;
+      if (!actorAgent || actorAgent.companyId !== existing.companyId || actorAgent.role !== "ceo") {
+        res.status(403).json({ error: "Only CEO can view permissions" });
+        return;
+      }
+    }
+
+    const keys = await access.listGrants(existing.companyId, "agent", existing.id);
+    res.json({ keys });
+  });
+
+  router.put("/agents/:id/grants", async (req, res) => {
+    const id = req.params.id as string;
+    const existing = await svc.getById(id);
+    if (!existing) {
+      res.status(404).json({ error: "Agent not found" });
+      return;
+    }
+    assertCompanyAccess(req, existing.companyId);
+
+    if (req.actor.type === "board") {
+      if (req.actor.source !== "local_implicit" && !req.actor.isInstanceAdmin) {
+        const allowed = await access.canUser(existing.companyId, req.actor.userId, "users:manage_permissions");
+        if (!allowed) {
+          res.status(403).json({ error: "Missing permission: users:manage_permissions" });
+          return;
+        }
+      }
+    }
+    if (req.actor.type === "agent") {
+      const actorAgent = req.actor.agentId ? await svc.getById(req.actor.agentId) : null;
+      if (!actorAgent || actorAgent.companyId !== existing.companyId || actorAgent.role !== "ceo") {
+        res.status(403).json({ error: "Only CEO can manage permissions" });
+        return;
+      }
+    }
+
+    const { keys } = req.body as { keys: string[] };
+    if (!Array.isArray(keys)) {
+      res.status(422).json({ error: "keys must be an array" });
+      return;
+    }
+
+    const validKeys = PERMISSION_KEYS.filter(k => keys.includes(k));
+    const grantedByUserId = req.actor.type === "board" ? (req.actor.userId ?? null) : null;
+
+    await access.setPrincipalGrants(
+      existing.companyId,
+      "agent",
+      existing.id,
+      validKeys.map(k => ({ permissionKey: k })),
+      grantedByUserId,
+    );
+
+    const actor = getActorInfo(req);
+    await logActivity(db, {
+      companyId: existing.companyId,
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      agentId: actor.agentId,
+      runId: actor.runId,
+      action: "agent.grants_updated",
+      entityType: "agent",
+      entityId: existing.id,
+      details: { keys: validKeys },
+    });
+
+    res.json({ keys: validKeys });
+  });
 
   router.patch(
     "/agents/:id/instructions-path",

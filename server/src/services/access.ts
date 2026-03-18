@@ -218,6 +218,26 @@ export function accessService(db: Db) {
       .then((rows) => rows[0]);
   }
 
+  async function listGrants(
+    companyId: string,
+    principalType: PrincipalType,
+    principalId: string,
+  ): Promise<PermissionKey[]> {
+    const membership = await getMembership(companyId, principalType, principalId);
+    if (!membership || membership.status !== "active") return [];
+    const rows = await db
+      .select({ permissionKey: principalPermissionGrants.permissionKey })
+      .from(principalPermissionGrants)
+      .where(
+        and(
+          eq(principalPermissionGrants.companyId, companyId),
+          eq(principalPermissionGrants.principalType, principalType),
+          eq(principalPermissionGrants.principalId, principalId),
+        )
+      );
+    return rows.map(r => r.permissionKey as PermissionKey);
+  }
+
   async function setPrincipalGrants(
     companyId: string,
     principalType: PrincipalType,
@@ -263,6 +283,7 @@ export function accessService(db: Db) {
     demoteInstanceAdmin,
     listUserCompanyAccess,
     setUserCompanyAccess,
+    listGrants,
     setPrincipalGrants,
   };
 }

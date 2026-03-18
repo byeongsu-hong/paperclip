@@ -7,6 +7,7 @@ import type {
   HeartbeatRun,
   Approval,
   AgentConfigRevision,
+  PermissionKey,
 } from "@paperclipai/shared";
 import { isUuidLike, normalizeAgentUrlKey } from "@paperclipai/shared";
 import { ApiError, api } from "./client";
@@ -102,6 +103,10 @@ export const agentsApi = {
     api.patch<Agent>(agentPath(id, companyId), data),
   updatePermissions: (id: string, data: { canCreateAgents: boolean }, companyId?: string) =>
     api.patch<Agent>(agentPath(id, companyId, "/permissions"), data),
+  getGrants: (id: string, companyId?: string): Promise<{ keys: PermissionKey[] }> =>
+    api.get(agentPath(id, companyId, "/grants")),
+  updateGrants: (id: string, keys: PermissionKey[], companyId?: string): Promise<{ keys: PermissionKey[] }> =>
+    api.put(agentPath(id, companyId, "/grants"), { keys }),
   pause: (id: string, companyId?: string) => api.post<Agent>(agentPath(id, companyId, "/pause"), {}),
   resume: (id: string, companyId?: string) => api.post<Agent>(agentPath(id, companyId, "/resume"), {}),
   terminate: (id: string, companyId?: string) => api.post<Agent>(agentPath(id, companyId, "/terminate"), {}),
