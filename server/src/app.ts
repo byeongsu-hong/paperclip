@@ -85,6 +85,18 @@ export async function createApp(
     },
   }));
   app.use(httpLogger);
+
+  // Register health route before hostname guard so Railway/k8s healthchecks are never blocked
+  app.use(
+    "/api/health",
+    healthRoutes(db, {
+      deploymentMode: opts.deploymentMode,
+      deploymentExposure: opts.deploymentExposure,
+      authReady: opts.authReady,
+      companyDeletionEnabled: opts.companyDeletionEnabled,
+    }),
+  );
+
   const privateHostnameGateEnabled =
     opts.deploymentMode === "authenticated" && opts.deploymentExposure === "private";
   const privateHostnameAllowSet = resolvePrivateHostnameAllowSet({
