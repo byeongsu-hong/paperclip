@@ -173,11 +173,13 @@ export function loadConfig(): Config {
       }
     })()
     : null;
+  const railwayPublicDomain = process.env.RAILWAY_PUBLIC_DOMAIN?.trim().toLowerCase() || null;
   const allowedHostnames = Array.from(
     new Set(
       [
         ...(allowedHostnamesFromEnv ?? fileConfig?.server.allowedHostnames ?? []),
         ...(publicUrlHostname ? [publicUrlHostname] : []),
+        ...(railwayPublicDomain ? [railwayPublicDomain] : []),
       ]
         .map((value) => value.trim().toLowerCase())
         .filter(Boolean),
