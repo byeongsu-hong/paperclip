@@ -20,6 +20,7 @@ COPY packages/adapters/gemini-local/package.json packages/adapters/gemini-local/
 COPY packages/adapters/openclaw-gateway/package.json packages/adapters/openclaw-gateway/
 COPY packages/adapters/opencode-local/package.json packages/adapters/opencode-local/
 COPY packages/adapters/pi-local/package.json packages/adapters/pi-local/
+COPY packages/agent-cli/package.json packages/agent-cli/
 
 RUN pnpm install --frozen-lockfile
 
@@ -30,11 +31,14 @@ COPY . .
 RUN pnpm --filter @paperclipai/ui build
 RUN pnpm --filter @paperclipai/server build
 RUN test -f server/dist/index.js || (echo "ERROR: server build output missing" && exit 1)
+RUN pnpm --filter @paperclipai/agent-cli build
 
 FROM base AS production
 WORKDIR /app
 COPY --chown=node:node --from=build /app /app
-RUN npm install --global --omit=dev @anthropic-ai/claude-code@latest @openai/codex@latest opencode-ai \
+RUN npm install --global --omit=dev @anthropic-ai/claude-code@latest @openai/codex@latest opencode-ai @google/generative-ai@latest \
+  && ln -s /app/packages/agent-cli/dist/index.js /usr/local/bin/pc \
+  && chmod +x /app/packages/agent-cli/dist/index.js \
   && mkdir -p /paperclip \
   && chown node:node /paperclip
 

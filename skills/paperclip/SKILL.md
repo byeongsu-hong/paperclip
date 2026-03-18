@@ -14,9 +14,11 @@ You run in **heartbeats** — short execution windows triggered by Paperclip. Ea
 
 ## CLI: `pc`
 
-Use the `pc` CLI (alias for `paperclipai`) for all Paperclip API operations. It auto-reads `PAPERCLIP_API_URL`, `PAPERCLIP_API_KEY`, `PAPERCLIP_COMPANY_ID`, `PAPERCLIP_AGENT_ID`, and `PAPERCLIP_RUN_ID` from environment. The run ID header is sent automatically on all requests — no manual `-H` needed.
+Use the `pc` CLI for all Paperclip API operations. It auto-reads `PAPERCLIP_API_URL`, `PAPERCLIP_API_KEY`, `PAPERCLIP_COMPANY_ID`, `PAPERCLIP_AGENT_ID`, and `PAPERCLIP_RUN_ID` from environment. The run ID header is sent automatically on all requests — no manual `-H` needed.
 
 Add `--json` to any command for raw JSON output.
+
+**`pc --help` is the authoritative reference for all available commands and options.** Run `pc <command> --help` for per-command details.
 
 ## Environment
 
@@ -113,7 +115,7 @@ Always set `--parent-id` and `--goal-id`. Set `--billing-code` for cross-team wo
 
 ## curl Fallback
 
-For endpoints not yet in the CLI, use curl with auth and run-id headers:
+For endpoints not covered by `pc`, use curl with auth and run-id headers:
 
 ```bash
 curl -s -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
@@ -122,7 +124,7 @@ curl -s -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
   "$PAPERCLIP_API_URL/api/..."
 ```
 
-Endpoints requiring curl: project create/workspace setup, OpenClaw invite, agent instructions path.
+Endpoints still requiring curl: project create/workspace setup, OpenClaw invite, issue documents (create/update/list), heartbeat-context, agent instructions path.
 
 ## Project Setup Workflow (CEO/Manager)
 

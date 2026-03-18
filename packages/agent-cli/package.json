@@ -1,0 +1,24 @@
+{
+  "name": "@paperclipai/agent-cli",
+  "version": "0.1.0",
+  "description": "Paperclip agent-dedicated CLI (pc)",
+  "type": "module",
+  "bin": {
+    "pc": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc && node -e \"const fs=require('fs');const f='dist/index.js';const c=fs.readFileSync(f,'utf8');if(!c.startsWith('#!/'))fs.writeFileSync(f,'#!/usr/bin/env node\\n'+c)\"",
+    "dev": "tsc --watch",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "commander": "^13.0.0",
+    "picocolors": "^1.1.0",
+    "@paperclipai/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5",
+    "@types/node": "^22.0.0"
+  }
+}

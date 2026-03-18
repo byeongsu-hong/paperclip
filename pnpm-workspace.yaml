@@ -6,3 +6,8 @@ packages:
   - server
   - ui
   - cli
+
+onlyBuiltDependencies:
+  - "@embedded-postgres/darwin-arm64"
+  - esbuild
+  - node-pty
