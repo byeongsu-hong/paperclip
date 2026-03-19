@@ -12,8 +12,8 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends nodejs \
   && rm -rf /var/lib/apt/lists/*
 RUN corepack enable \
-  && groupadd --gid 1000 node \
-  && useradd --uid 1000 --gid node --shell /bin/bash --create-home node
+  && groupadd --gid 1001 node \
+  && useradd --uid 1001 --gid node --shell /bin/bash --create-home node
 
 FROM base AS deps
 WORKDIR /app
