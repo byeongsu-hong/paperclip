@@ -1,6 +1,9 @@
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import os from "node:os";
 import { Router } from "express";
+
+const require = createRequire(import.meta.url);
 import { checkAllCliStatusesAsync } from "../services/cli-auth.js";
 import { initAgentWorkspace } from "../services/agent-workspace.js";
 import { forbidden } from "../errors.js";
@@ -38,7 +41,7 @@ export function modelsRoutes() {
       };
     }
     try {
-      const pty = require("@homebridge/node-pty-prebuilt-multiarch");
+      const pty = require("@homebridge/node-pty-prebuilt-multiarch") as any;
       results["node-pty"] = { available: true, type: typeof pty.spawn };
     } catch (e: any) {
       results["node-pty"] = { available: false, error: e?.message };
