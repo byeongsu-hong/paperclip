@@ -1,4 +1,4 @@
-FROM node:lts-trixie-slim AS base
+FROM node:lts-bookworm AS base
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates curl git python3 make g++ gosu \
   && rm -rf /var/lib/apt/lists/*

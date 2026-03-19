@@ -57,13 +57,13 @@ export function handleCliAuthWebSocket(
     return;
   }
 
-  // Lazy-require node-pty so the module can load even if not yet installed
-  let pty: typeof import("node-pty");
+  // Lazy-require @homebridge/node-pty-prebuilt-multiarch so the module can load even if not yet installed
+  let pty: typeof import("@homebridge/node-pty-prebuilt-multiarch");
   try {
-    pty = require("node-pty") as typeof import("node-pty");
+    pty = require("@homebridge/node-pty-prebuilt-multiarch") as typeof import("@homebridge/node-pty-prebuilt-multiarch");
   } catch (err) {
-    logger.error({ err }, "node-pty is not available");
-    sendError(ws, "node-pty is not available on this server");
+    logger.error({ err }, "@homebridge/node-pty-prebuilt-multiarch is not available");
+    sendError(ws, "@homebridge/node-pty-prebuilt-multiarch is not available on this server");
     ws.close();
     return;
   }

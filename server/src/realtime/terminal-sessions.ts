@@ -33,12 +33,12 @@ const { WebSocketServer } = require("ws") as {
 };
 
 export function handleTerminalWebSocket(ws: WsSocket) {
-  // Lazy-require node-pty so the module can load even if not yet installed
-  let pty: typeof import("node-pty");
+  // Lazy-require @homebridge/node-pty-prebuilt-multiarch so the module can load even if not yet installed
+  let pty: typeof import("@homebridge/node-pty-prebuilt-multiarch");
   try {
-    pty = require("node-pty") as typeof import("node-pty");
+    pty = require("@homebridge/node-pty-prebuilt-multiarch") as typeof import("@homebridge/node-pty-prebuilt-multiarch");
   } catch {
-    ws.send(JSON.stringify({ type: "error", message: "node-pty is not available on this server" }));
+    ws.send(JSON.stringify({ type: "error", message: "@homebridge/node-pty-prebuilt-multiarch is not available on this server" }));
     ws.close();
     return;
   }
