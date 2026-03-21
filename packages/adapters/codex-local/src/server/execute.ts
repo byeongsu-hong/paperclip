@@ -67,6 +67,11 @@ function resolveCodexBiller(env: Record<string, string>, billingType: "api" | "s
   return billingType === "subscription" ? "chatgpt" : openAiCompatibleBiller ?? "openai";
 }
 
+function codexBypassBlockedByPrivileges(): boolean {
+  if (typeof process.getuid === "function" && process.getuid() === 0) return true;
+  return Boolean(process.env.SUDO_UID || process.env.SUDO_USER);
+}
+
 async function isLikelyPaperclipRepoRoot(candidate: string): Promise<boolean> {
   const [hasWorkspace, hasPackageJson, hasServerDir, hasAdapterUtilsDir] = await Promise.all([
     pathExists(path.join(candidate, "pnpm-workspace.yaml")),
@@ -184,6 +189,13 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     config.dangerouslyBypassApprovalsAndSandbox,
     asBoolean(config.dangerouslyBypassSandbox, false),
   );
+  const effectiveBypass = bypass && !codexBypassBlockedByPrivileges();
+  if (bypass && !effectiveBypass) {
+    await onLog(
+      "stdout",
+      "[paperclip] Codex bypass approvals/sandbox flag disabled automatically because this runtime has root or sudo privileges.\n",
+    );
+  }
 
   const workspaceContext = parseObject(context.paperclipWorkspace);
   const workspaceCwd = asString(workspaceContext.cwd, "");
@@ -420,7 +432,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   const buildArgs = (resumeSessionId: string | null) => {
     const args = ["exec", "--json"];
     if (search) args.unshift("--search");
-    if (bypass) args.push("--dangerously-bypass-approvals-and-sandbox");
+    if (effectiveBypass) args.push("--dangerously-bypass-approvals-and-sandbox");
     if (model) args.push("--model", model);
     if (modelReasoningEffort) args.push("-c", `model_reasoning_effort=${JSON.stringify(modelReasoningEffort)}`);
     if (extraArgs.length > 0) args.push(...extraArgs);

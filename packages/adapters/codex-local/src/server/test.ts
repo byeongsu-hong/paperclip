@@ -40,6 +40,11 @@ function commandLooksLike(command: string, expected: string): boolean {
   return base === expected || base === `${expected}.cmd` || base === `${expected}.exe`;
 }
 
+function codexBypassBlockedByPrivileges(): boolean {
+  if (typeof process.getuid === "function" && process.getuid() === 0) return true;
+  return Boolean(process.env.SUDO_UID || process.env.SUDO_USER);
+}
+
 function summarizeProbeDetail(stdout: string, stderr: string, parsedError: string | null): string | null {
   const raw = parsedError?.trim() || firstNonEmptyLine(stderr) || firstNonEmptyLine(stdout);
   if (!raw) return null;
@@ -138,6 +143,7 @@ export async function testEnvironment(
         config.dangerouslyBypassApprovalsAndSandbox,
         asBoolean(config.dangerouslyBypassSandbox, false),
       );
+      const effectiveBypass = bypass && !codexBypassBlockedByPrivileges();
       const extraArgs = (() => {
         const fromExtraArgs = asStringArray(config.extraArgs);
         if (fromExtraArgs.length > 0) return fromExtraArgs;
@@ -146,7 +152,7 @@ export async function testEnvironment(
 
       const args = ["exec", "--json"];
       if (search) args.unshift("--search");
-      if (bypass) args.push("--dangerously-bypass-approvals-and-sandbox");
+      if (effectiveBypass) args.push("--dangerously-bypass-approvals-and-sandbox");
       if (model) args.push("--model", model);
       if (modelReasoningEffort) {
         args.push("-c", `model_reasoning_effort=${JSON.stringify(modelReasoningEffort)}`);
@@ -202,6 +208,14 @@ export async function testEnvironment(
           ...(detail ? { detail } : {}),
           hint: "Configure OPENAI_API_KEY in adapter env/shell or run `codex login`, then retry the probe.",
         });
+        if (bypass && !effectiveBypass) {
+          checks.push({
+            code: "codex_bypass_disabled_for_privileged_runtime",
+            level: "warn",
+            message: "Codex bypass approvals/sandbox was disabled because this runtime has root or sudo privileges.",
+            hint: "Use the default sandboxed Codex mode in hosted/container environments.",
+          });
+        }
       } else {
         checks.push({
           code: "codex_hello_probe_failed",
