@@ -25,10 +25,13 @@ import { queryKeys } from "../lib/queryKeys";
 import { useInboxBadge } from "../hooks/useInboxBadge";
 import { Button } from "@/components/ui/button";
 import { PluginSlotOutlet } from "@/plugins/slots";
+import { useTerminalPanel } from "../context/TerminalPanelContext";
+import { cn } from "../lib/utils";
 
 export function Sidebar() {
   const { openNewIssue } = useDialog();
   const { selectedCompanyId, selectedCompany } = useCompany();
+  const { visible: terminalVisible, openTerminalPanel } = useTerminalPanel();
   const inboxBadge = useInboxBadge(selectedCompanyId);
   const { data: liveRuns } = useQuery({
     queryKey: queryKeys.liveRuns(selectedCompanyId!),
@@ -109,7 +112,19 @@ export function Sidebar() {
 
         <SidebarSection label="Workspace">
           <SidebarNavItem to="/filesystem" label="Filesystem" icon={FolderOpen} />
-          <SidebarNavItem to="/terminal" label="Terminal" icon={SquareTerminal} />
+          <button
+            type="button"
+            onClick={() => openTerminalPanel()}
+            className={cn(
+              "flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium transition-colors",
+              terminalVisible
+                ? "bg-accent text-foreground"
+                : "text-foreground/80 hover:bg-accent/50 hover:text-foreground",
+            )}
+          >
+            <SquareTerminal className="h-4 w-4 shrink-0" />
+            <span className="truncate">Terminal</span>
+          </button>
           <SidebarNavItem to="/chat" label="Chat" icon={MessageSquare} />
         </SidebarSection>
 

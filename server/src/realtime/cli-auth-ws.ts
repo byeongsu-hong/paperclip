@@ -149,11 +149,25 @@ export function setupCliAuthWebSocketServer(
     const url = new URL(req.url, "http://localhost");
     if (!url.pathname.startsWith("/api/models/auth/")) return;
 
+    logger.info(
+      {
+        path: url.pathname,
+        deploymentMode: opts.deploymentMode,
+        hasCookie: typeof req.headers.cookie === "string" && req.headers.cookie.length > 0,
+      },
+      "cli-auth WS: upgrade request received",
+    );
+
     const proceed = (authenticated: boolean) => {
-      wss.handleUpgrade(req, socket, head, (ws) => {
-        (req as any)._authenticated = authenticated;
-        wss.emit("connection", ws, req);
-      });
+      try {
+        wss.handleUpgrade(req, socket, head, (ws) => {
+          (req as any)._authenticated = authenticated;
+          wss.emit("connection", ws, req);
+        });
+      } catch (err) {
+        logger.error({ err, path: url.pathname }, "cli-auth WS: handleUpgrade failed");
+        socket.destroy();
+      }
     };
 
     if (opts.resolveSessionFromHeaders) {

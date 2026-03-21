@@ -7,6 +7,7 @@ import { Sidebar } from "./Sidebar";
 import { InstanceSidebar } from "./InstanceSidebar";
 import { BreadcrumbBar } from "./BreadcrumbBar";
 import { PropertiesPanel } from "./PropertiesPanel";
+import { GlobalTerminalPanel } from "./GlobalTerminalPanel";
 import { CommandPalette } from "./CommandPalette";
 import { NewIssueDialog } from "./NewIssueDialog";
 import { NewProjectDialog } from "./NewProjectDialog";
@@ -408,6 +409,7 @@ export function Layout() {
               )}
             </main>
             <PropertiesPanel />
+            <GlobalTerminalPanel />
           </div>
         </div>
       </div>

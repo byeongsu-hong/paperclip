@@ -71,6 +71,10 @@ function parseCompanyId(pathname: string) {
   }
 }
 
+function isLiveEventsPath(pathname: string) {
+  return pathname.startsWith("/api/companies/") && pathname.endsWith("/events/ws");
+}
+
 function parseBearerToken(rawAuth: string | string[] | undefined) {
   const auth = Array.isArray(rawAuth) ? rawAuth[0] : rawAuth;
   if (!auth) return null;
@@ -240,9 +244,13 @@ export function setupLiveEventsWebSocketServer(
     }
 
     const url = new URL(req.url, "http://localhost");
+    if (!isLiveEventsPath(url.pathname)) {
+      return;
+    }
+
     const companyId = parseCompanyId(url.pathname);
     if (!companyId) {
-      socket.destroy();
+      rejectUpgrade(socket, "400 Bad Request", "invalid company websocket path");
       return;
     }
 

@@ -10,7 +10,6 @@ import { agentsApi } from "../api/agents";
 import { issuesApi } from "../api/issues";
 import { queryKeys } from "../lib/queryKeys";
 import { modelsApi, type CliAuthStatus } from "@/api/models";
-import { CliAuthTerminal } from "./CliAuthTerminal";
 import { Dialog, DialogPortal } from "@/components/ui/dialog";
 import {
   Popover,
@@ -37,6 +36,7 @@ import { AsciiArtAnimation } from "./AsciiArtAnimation";
 import { ChoosePathButton } from "./PathInstructionsModal";
 import { HintIcon } from "./agent-config-primitives";
 import { OpenCodeLogoIcon } from "./OpenCodeLogoIcon";
+import { useTerminalPanel } from "../context/TerminalPanelContext";
 import {
   Building2,
   Bot,
@@ -82,6 +82,7 @@ export function OnboardingWizard() {
   const { selectedCompanyId, companies, setSelectedCompanyId } = useCompany();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { runTerminalCommand } = useTerminalPanel();
 
   const initialStep = onboardingOptions.initialStep ?? 1;
   const existingCompanyId = onboardingOptions.companyId;
@@ -115,6 +116,7 @@ export function OnboardingWizard() {
   const [cliAuthStatus, setCliAuthStatus] = useState<CliAuthStatus | null>(null);
   const [cliAuthLoading, setCliAuthLoading] = useState(false);
   const [showCliAuth, setShowCliAuth] = useState(false);
+  const cliAuthPollTimerRef = useRef<number | null>(null);
 
   // Step 3
   const [taskTitle, setTaskTitle] = useState("Create your CEO HEARTBEAT.md");
@@ -255,6 +257,18 @@ export function OnboardingWizard() {
     gemini_local: "gemini",
     codex_local: "codex",
   };
+  const CLI_AUTH_COMMANDS: Partial<Record<string, string>> = {
+    claude: "claude auth login",
+    gemini: "gemini auth login",
+    codex: "codex login",
+  };
+
+  const stopCliAuthPolling = useCallback(() => {
+    if (cliAuthPollTimerRef.current != null) {
+      window.clearInterval(cliAuthPollTimerRef.current);
+      cliAuthPollTimerRef.current = null;
+    }
+  }, []);
 
   async function checkAdapterAuthStatus(adapter: string) {
     const cliName = CLI_AUTH_REQUIRED[adapter];
@@ -269,10 +283,23 @@ export function OnboardingWizard() {
       const status = statuses[cliName] ?? "not-installed";
       setCliAuthStatus(status);
       setShowCliAuth(status === "unauthenticated");
+      if (status === "authenticated") stopCliAuthPolling();
     } finally {
       setCliAuthLoading(false);
     }
   }
+
+  const launchCliAuth = useCallback((adapter: string) => {
+    const cliName = CLI_AUTH_REQUIRED[adapter];
+    const command = cliName ? CLI_AUTH_COMMANDS[cliName] : null;
+    if (!command) return;
+    runTerminalCommand(command);
+    void checkAdapterAuthStatus(adapter);
+    stopCliAuthPolling();
+    cliAuthPollTimerRef.current = window.setInterval(() => {
+      void checkAdapterAuthStatus(adapter);
+    }, 2000);
+  }, [checkAdapterAuthStatus, runTerminalCommand, stopCliAuthPolling]);
 
   function reset() {
     setStep(1);
@@ -301,12 +328,17 @@ export function OnboardingWizard() {
     setCliAuthStatus(null);
     setCliAuthLoading(false);
     setShowCliAuth(false);
+    stopCliAuthPolling();
   }
 
   function handleClose() {
     reset();
     closeOnboarding();
   }
+
+  useEffect(() => () => {
+    stopCliAuthPolling();
+  }, [stopCliAuthPolling]);
 
   function buildAdapterConfig(): Record<string, unknown> {
     const adapter = getUIAdapter(adapterType);
@@ -1014,13 +1046,29 @@ export function OnboardingWizard() {
                         {adapterType === "codex_local" && "Codex CLI"}
                         {" "}인증이 필요합니다
                       </span>
-                      <CliAuthTerminal
-                        cliName={CLI_AUTH_REQUIRED[adapterType]!}
-                        onComplete={() => {
-                          setShowCliAuth(false);
-                          setCliAuthStatus("authenticated");
-                        }}
-                      />
+                      <p className="text-xs text-muted-foreground">
+                        전역 터미널 패널에서 로그인 명령을 실행합니다. 브라우저 인증을 마친 뒤 상태가 자동으로 다시 확인됩니다.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => launchCliAuth(adapterType)}
+                        >
+                          <Terminal className="h-3.5 w-3.5 mr-1" />
+                          Open Terminal & Authenticate
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={cliAuthLoading}
+                          onClick={() => void checkAdapterAuthStatus(adapterType)}
+                        >
+                          {cliAuthLoading ? "Checking..." : "Check again"}
+                        </Button>
+                      </div>
                     </div>
                   )}
 
