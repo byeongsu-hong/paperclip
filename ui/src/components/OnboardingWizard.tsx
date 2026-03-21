@@ -266,10 +266,14 @@ export function OnboardingWizard() {
   const isRemoteHostedApp =
     typeof window !== "undefined" &&
     !["localhost", "127.0.0.1"].includes(window.location.hostname);
+  const codexLoginBaseCommand =
+    "codex login -c dangerously_bypass_approvals_and_sandbox=false";
   const CLI_AUTH_COMMANDS: Partial<Record<string, string>> = {
     claude: "claude auth login",
     gemini: "gemini auth login",
-    codex: isRemoteHostedApp ? "codex login --device-auth" : "codex login",
+    codex: isRemoteHostedApp
+      ? `${codexLoginBaseCommand} --device-auth`
+      : codexLoginBaseCommand,
   };
 
   const stopCliAuthPolling = useCallback(() => {

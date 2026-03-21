@@ -11,7 +11,7 @@
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "node --import ./server/node_modules/tsx/dist/loader.mjs server/dist/index.js"
+startCommand = "docker-entrypoint.sh node --import ./server/node_modules/tsx/dist/loader.mjs server/dist/index.js"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
