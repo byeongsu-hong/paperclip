@@ -24,6 +24,7 @@ import { useTheme } from "../context/ThemeContext";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { useCompanyPageMemory } from "../hooks/useCompanyPageMemory";
 import { healthApi } from "../api/health";
+import { useTerminalPanel } from "../context/TerminalPanelContext";
 import { shouldSyncCompanySelectionFromRoute } from "../lib/company-selection";
 import {
   DEFAULT_INSTANCE_SETTINGS_PATH,
@@ -58,6 +59,7 @@ export function Layout() {
     setSelectedCompanyId,
   } = useCompany();
   const { theme, toggleTheme } = useTheme();
+  const { visible: terminalVisible, position: terminalPosition, hasActivated: terminalHasActivated } = useTerminalPanel();
   const { companyPrefix } = useParams<{ companyPrefix: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -390,26 +392,34 @@ export function Layout() {
           >
             <BreadcrumbBar />
           </div>
-          <div className={cn(isMobile ? "block" : "relative flex flex-1 min-h-0 overflow-hidden")}>
-            <main
-              id="main-content"
-              tabIndex={-1}
-              className={cn(
-                "flex-1 p-4 md:p-6",
-                isMobile ? "overflow-visible pb-[calc(5rem+env(safe-area-inset-bottom))]" : "overflow-auto",
-              )}
-            >
-              {hasUnknownCompanyPrefix ? (
-                <NotFoundPage
-                  scope="invalid_company_prefix"
-                  requestedPrefix={companyPrefix ?? selectedCompany?.issuePrefix}
-                />
-              ) : (
-                <Outlet />
-              )}
-            </main>
-            <PropertiesPanel />
-            <GlobalTerminalPanel />
+          <div
+            className={cn(
+              isMobile ? "block" : "flex flex-1 min-h-0 overflow-hidden",
+              !isMobile && terminalHasActivated && terminalVisible && terminalPosition === "bottom" && "flex-col",
+            )}
+          >
+            <div className={cn(isMobile ? "block" : "flex flex-1 min-h-0 overflow-hidden")}>
+              <main
+                id="main-content"
+                tabIndex={-1}
+                className={cn(
+                  "flex-1 p-4 md:p-6",
+                  isMobile ? "overflow-visible pb-[calc(5rem+env(safe-area-inset-bottom))]" : "overflow-auto",
+                )}
+              >
+                {hasUnknownCompanyPrefix ? (
+                  <NotFoundPage
+                    scope="invalid_company_prefix"
+                    requestedPrefix={companyPrefix ?? selectedCompany?.issuePrefix}
+                  />
+                ) : (
+                  <Outlet />
+                )}
+              </main>
+              <PropertiesPanel />
+              <GlobalTerminalPanel dock="right" />
+            </div>
+            <GlobalTerminalPanel dock="bottom" />
           </div>
         </div>
       </div>
