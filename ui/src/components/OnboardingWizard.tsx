@@ -37,6 +37,7 @@ import { ChoosePathButton } from "./PathInstructionsModal";
 import { HintIcon } from "./agent-config-primitives";
 import { OpenCodeLogoIcon } from "./OpenCodeLogoIcon";
 import { useTerminalPanel } from "../context/TerminalPanelContext";
+import { GlobalTerminalPanel } from "./GlobalTerminalPanel";
 import {
   Building2,
   Bot,
@@ -82,7 +83,12 @@ export function OnboardingWizard() {
   const { selectedCompanyId, companies, setSelectedCompanyId } = useCompany();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { runTerminalCommand } = useTerminalPanel();
+  const {
+    runTerminalCommand,
+    visible: terminalVisible,
+    hasActivated: terminalHasActivated,
+    position: terminalPosition,
+  } = useTerminalPanel();
 
   const initialStep = onboardingOptions.initialStep ?? 1;
   const existingCompanyId = onboardingOptions.companyId;
@@ -270,14 +276,19 @@ export function OnboardingWizard() {
     }
   }, []);
 
-  async function checkAdapterAuthStatus(adapter: string) {
+  async function checkAdapterAuthStatus(
+    adapter: string,
+    opts?: { background?: boolean },
+  ) {
     const cliName = CLI_AUTH_REQUIRED[adapter];
     if (!cliName) {
       setCliAuthStatus("authenticated");
       setShowCliAuth(false);
       return;
     }
-    setCliAuthLoading(true);
+    if (!opts?.background) {
+      setCliAuthLoading(true);
+    }
     try {
       const { statuses } = await modelsApi.getStatus();
       const status = statuses[cliName] ?? "not-installed";
@@ -285,7 +296,9 @@ export function OnboardingWizard() {
       setShowCliAuth(status === "unauthenticated");
       if (status === "authenticated") stopCliAuthPolling();
     } finally {
-      setCliAuthLoading(false);
+      if (!opts?.background) {
+        setCliAuthLoading(false);
+      }
     }
   }
 
@@ -297,7 +310,7 @@ export function OnboardingWizard() {
     void checkAdapterAuthStatus(adapter);
     stopCliAuthPolling();
     cliAuthPollTimerRef.current = window.setInterval(() => {
-      void checkAdapterAuthStatus(adapter);
+      void checkAdapterAuthStatus(adapter, { background: true });
     }, 2000);
   }, [checkAdapterAuthStatus, runTerminalCommand, stopCliAuthPolling]);
 
@@ -628,23 +641,31 @@ export function OnboardingWizard() {
             RemoveScroll which blocks wheel events on our custom (non-DialogContent)
             scroll container. A plain div preserves the background without scroll-locking. */}
         <div className="fixed inset-0 z-50 bg-background" />
-        <div className="fixed inset-0 z-50 flex" onKeyDown={handleKeyDown}>
-          {/* Close button */}
-          <button
-            onClick={handleClose}
-            className="absolute top-4 left-4 z-10 rounded-sm p-1.5 text-muted-foreground/60 hover:text-foreground transition-colors"
-          >
-            <X className="h-5 w-5" />
-            <span className="sr-only">Close</span>
-          </button>
+        <div
+          className={cn(
+            "fixed inset-0 z-50",
+            terminalVisible && terminalHasActivated && terminalPosition === "bottom"
+              ? "flex flex-col"
+              : "flex",
+          )}
+        >
+          <div className="relative flex flex-1 min-h-0" onKeyDown={handleKeyDown}>
+            {/* Close button */}
+            <button
+              onClick={handleClose}
+              className="absolute top-4 left-4 z-10 rounded-sm p-1.5 text-muted-foreground/60 hover:text-foreground transition-colors"
+            >
+              <X className="h-5 w-5" />
+              <span className="sr-only">Close</span>
+            </button>
 
-          {/* Left half — form */}
-          <div
-            className={cn(
-              "w-full flex flex-col overflow-y-auto transition-[width] duration-500 ease-in-out",
-              step === 1 ? "md:w-1/2" : "md:w-full"
-            )}
-          >
+            {/* Left half — form */}
+            <div
+              className={cn(
+                "w-full flex flex-col overflow-y-auto transition-[width] duration-500 ease-in-out",
+                step === 1 ? "md:w-1/2" : "md:w-full"
+              )}
+            >
             <div className="w-full max-w-md mx-auto my-auto px-8 py-12 shrink-0">
               {/* Progress tabs */}
               <div className="flex items-center gap-0 mb-8 border-b border-border">
@@ -1425,18 +1446,21 @@ export function OnboardingWizard() {
                   )}
                 </div>
               </div>
+              </div>
             </div>
-          </div>
 
-          {/* Right half — ASCII art (hidden on mobile) */}
-          <div
-            className={cn(
-              "hidden md:block overflow-hidden bg-[#1d1d1d] transition-[width,opacity] duration-500 ease-in-out",
-              step === 1 ? "w-1/2 opacity-100" : "w-0 opacity-0"
-            )}
-          >
-            <AsciiArtAnimation />
+            {/* Right half — ASCII art (hidden on mobile) */}
+            <div
+              className={cn(
+                "hidden md:block overflow-hidden bg-[#1d1d1d] transition-[width,opacity] duration-500 ease-in-out",
+                step === 1 ? "w-1/2 opacity-100" : "w-0 opacity-0"
+              )}
+            >
+              <AsciiArtAnimation />
+            </div>
+            <GlobalTerminalPanel dock="right" host="onboarding" />
           </div>
+          <GlobalTerminalPanel dock="bottom" host="onboarding" />
         </div>
       </DialogPortal>
     </Dialog>

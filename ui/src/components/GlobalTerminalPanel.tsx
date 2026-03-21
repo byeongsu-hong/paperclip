@@ -3,11 +3,13 @@ import { ArrowRightToLine, ArrowDownToLine, GripVertical, GripHorizontal, X, Squ
 import { Button } from "@/components/ui/button";
 import { useSidebar } from "../context/SidebarContext";
 import { useTerminalPanel } from "../context/TerminalPanelContext";
+import { useDialog } from "../context/DialogContext";
 import { TerminalPane } from "./TerminalPane";
 import { cn } from "../lib/utils";
 
-export function GlobalTerminalPanel({ dock }: { dock: "right" | "bottom" }) {
+export function GlobalTerminalPanel({ dock, host = "layout" }: { dock: "right" | "bottom"; host?: "layout" | "onboarding" }) {
   const { isMobile } = useSidebar();
+  const { onboardingOpen } = useDialog();
   const {
     visible,
     hasActivated,
@@ -67,6 +69,8 @@ export function GlobalTerminalPanel({ dock }: { dock: "right" | "bottom" }) {
   }
 
   if (isMobile || !hasActivated || position !== dock) return null;
+  if (host === "layout" && onboardingOpen) return null;
+  if (host === "onboarding" && !onboardingOpen) return null;
 
   return (
     <aside

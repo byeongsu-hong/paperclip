@@ -417,9 +417,9 @@ export function Layout() {
                 )}
               </main>
               <PropertiesPanel />
-              <GlobalTerminalPanel dock="right" />
+              <GlobalTerminalPanel dock="right" host="layout" />
             </div>
-            <GlobalTerminalPanel dock="bottom" />
+            <GlobalTerminalPanel dock="bottom" host="layout" />
           </div>
         </div>
       </div>
