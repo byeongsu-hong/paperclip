@@ -31,7 +31,7 @@ import { cn } from "../lib/utils";
 export function Sidebar() {
   const { openNewIssue } = useDialog();
   const { selectedCompanyId, selectedCompany } = useCompany();
-  const { visible: terminalVisible, openTerminalPanel } = useTerminalPanel();
+  const { visible: terminalVisible, toggleTerminalPanel } = useTerminalPanel();
   const inboxBadge = useInboxBadge(selectedCompanyId);
   const { data: liveRuns } = useQuery({
     queryKey: queryKeys.liveRuns(selectedCompanyId!),
@@ -114,7 +114,7 @@ export function Sidebar() {
           <SidebarNavItem to="/filesystem" label="Filesystem" icon={FolderOpen} />
           <button
             type="button"
-            onClick={() => openTerminalPanel()}
+            onClick={toggleTerminalPanel}
             className={cn(
               "flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium transition-colors",
               terminalVisible

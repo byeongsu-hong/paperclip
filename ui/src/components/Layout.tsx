@@ -390,7 +390,7 @@ export function Layout() {
           >
             <BreadcrumbBar />
           </div>
-          <div className={cn(isMobile ? "block" : "flex flex-1 min-h-0")}>
+          <div className={cn(isMobile ? "block" : "relative flex flex-1 min-h-0 overflow-hidden")}>
             <main
               id="main-content"
               tabIndex={-1}
