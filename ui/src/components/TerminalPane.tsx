@@ -11,6 +11,7 @@ type Props = {
 
 export function TerminalPane({ wsUrl, commandRequest = null }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const termRef = useRef<Terminal | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const queuedInputRef = useRef<string[]>([]);
 
@@ -25,16 +26,20 @@ export function TerminalPane({ wsUrl, commandRequest = null }: Props) {
 
   useEffect(() => {
     if (!commandRequest) return;
+    termRef.current?.focus();
+    termRef.current?.scrollToBottom();
     sendInput(`${commandRequest.command}\r`);
   }, [commandRequest, sendInput]);
 
   useEffect(() => {
     if (!containerRef.current) return;
     const term = new Terminal({ cursorBlink: true, fontSize: 13, fontFamily: "monospace" });
+    termRef.current = term;
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.open(containerRef.current);
     fitAddon.fit();
+    term.focus();
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
@@ -52,15 +57,27 @@ export function TerminalPane({ wsUrl, commandRequest = null }: Props) {
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data as string);
-        if (msg.type === "output") term.write(msg.data);
-        if (msg.type === "error") term.write(`\r\n\x1b[31mError: ${msg.message as string}\x1b[0m\r\n`);
-        if (msg.type === "exit") term.write(`\r\n[process exited: ${String(msg.exitCode)}]\r\n`);
+        if (msg.type === "output") {
+          term.write(msg.data);
+          term.scrollToBottom();
+        }
+        if (msg.type === "error") {
+          term.write(`\r\n\x1b[31mError: ${msg.message as string}\x1b[0m\r\n`);
+          term.scrollToBottom();
+        }
+        if (msg.type === "exit") {
+          term.write(`\r\n[process exited: ${String(msg.exitCode)}]\r\n`);
+          term.scrollToBottom();
+        }
       } catch {
         // ignore
       }
     };
 
-    ws.onclose = () => term.write("\r\n[Connection closed]\r\n");
+    ws.onclose = () => {
+      term.write("\r\n[Connection closed]\r\n");
+      term.scrollToBottom();
+    };
 
     const observer = new ResizeObserver(() => {
       fitAddon.fit();
@@ -75,6 +92,7 @@ export function TerminalPane({ wsUrl, commandRequest = null }: Props) {
       observer.disconnect();
       ws.close();
       wsRef.current = null;
+      termRef.current = null;
       term.dispose();
     };
   }, [sendInput, wsUrl]);

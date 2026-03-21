@@ -263,10 +263,13 @@ export function OnboardingWizard() {
     gemini_local: "gemini",
     codex_local: "codex",
   };
+  const isRemoteHostedApp =
+    typeof window !== "undefined" &&
+    !["localhost", "127.0.0.1"].includes(window.location.hostname);
   const CLI_AUTH_COMMANDS: Partial<Record<string, string>> = {
     claude: "claude auth login",
     gemini: "gemini auth login",
-    codex: "codex login",
+    codex: isRemoteHostedApp ? "codex login --device-auth" : "codex login",
   };
 
   const stopCliAuthPolling = useCallback(() => {
@@ -1070,6 +1073,11 @@ export function OnboardingWizard() {
                       <p className="text-xs text-muted-foreground">
                         전역 터미널 패널에서 로그인 명령을 실행합니다. 브라우저 인증을 마친 뒤 상태가 자동으로 다시 확인됩니다.
                       </p>
+                      {adapterType === "codex_local" && isRemoteHostedApp && (
+                        <p className="text-xs text-amber-700">
+                          배포 환경에서는 로컬 콜백 서버를 쓸 수 없어서 device auth 모드로 실행합니다.
+                        </p>
+                      )}
                       <div className="flex items-center gap-2">
                         <Button
                           type="button"
