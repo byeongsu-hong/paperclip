@@ -1,4 +1,5 @@
 const BOARD_ROUTE_ROOTS = new Set([
+  "onboarding",
   "dashboard",
   "companies",
   "company",
@@ -12,7 +13,12 @@ const BOARD_ROUTE_ROOTS = new Set([
   "usage",
   "activity",
   "inbox",
+  "filesystem",
+  "terminal",
+  "chat",
   "design-guide",
+  "plugins",
+  "tests",
 ]);
 
 const GLOBAL_ROUTE_ROOTS = new Set(["auth", "invite", "board-claim", "docs", "instance"]);
