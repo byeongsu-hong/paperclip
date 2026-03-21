@@ -73,8 +73,8 @@ export function GlobalTerminalPanel({ dock }: { dock: "right" | "bottom" }) {
       className={cn(
         "hidden md:flex shrink-0 overflow-hidden bg-card transition-[opacity,height,width] duration-200 ease-in-out",
         position === "right"
-          ? "h-full border-l border-border"
-          : "w-full border-t border-border",
+          ? "h-full flex-row border-l border-border"
+          : "w-full flex-col border-t border-border",
         visible ? "opacity-100" : "pointer-events-none opacity-0",
       )}
       style={
